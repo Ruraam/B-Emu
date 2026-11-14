@@ -1,0 +1,17 @@
+[package]
+name = "b-emu"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Native Wayland frontend for B-Emu"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+slint = { version = "~1.18.1", default-features = false, features = [
+    "backend-winit-wayland",
+    "renderer-femtovg",
+    "renderer-software",
+] }
+
+[build-dependencies]
+slint-build = "~1.18.1"
