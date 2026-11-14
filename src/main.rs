@@ -2,9 +2,7 @@ slint::include_modules!();
 
 fn main() {
     if std::env::var_os("WAYLAND_DISPLAY").is_none() {
-        eprintln!(
-            "B-Emu requires a native Wayland session. X11 and XWayland are not supported."
-        );
+        eprintln!("B-Emu requires a native Wayland session. X11 and XWayland are not supported.");
         std::process::exit(1);
     }
 
