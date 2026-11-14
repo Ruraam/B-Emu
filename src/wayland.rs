@@ -65,9 +65,9 @@ fn socket_path_from_values(
         display
     } else {
         if display.as_os_str().is_empty()
-            || display.components().any(|component| {
-                matches!(component, Component::ParentDir | Component::RootDir)
-            })
+            || display
+                .components()
+                .any(|component| matches!(component, Component::ParentDir | Component::RootDir))
         {
             return Err(WaylandError::InvalidDisplayName);
         }
@@ -99,7 +99,7 @@ fn validate_socket_path(path: &Path) -> Result<(), WaylandError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{socket_path_from_values, WaylandError};
+    use super::{WaylandError, socket_path_from_values};
     use std::ffi::OsString;
     use std::os::unix::net::UnixListener;
     use std::path::PathBuf;
@@ -115,10 +115,8 @@ mod tests {
     impl TestSocket {
         fn new() -> Self {
             let id = NEXT_TEMP_ID.fetch_add(1, Ordering::Relaxed);
-            let dir = std::env::temp_dir().join(format!(
-                "b-emu-wayland-test-{}-{id}",
-                std::process::id()
-            ));
+            let dir = std::env::temp_dir()
+                .join(format!("b-emu-wayland-test-{}-{id}", std::process::id()));
             std::fs::create_dir_all(&dir).unwrap();
             let listener = UnixListener::bind(dir.join("wayland-test")).unwrap();
 
@@ -179,10 +177,7 @@ mod tests {
     fn absolute_display_path_does_not_require_runtime_directory() {
         let socket = TestSocket::new();
         assert_eq!(
-            socket_path_from_values(
-                Some(socket.socket().as_os_str().to_os_string()),
-                None
-            ),
+            socket_path_from_values(Some(socket.socket().as_os_str().to_os_string()), None),
             Ok(socket.socket())
         );
     }
@@ -203,10 +198,7 @@ mod tests {
     fn missing_socket_is_reported() {
         let path = PathBuf::from("/tmp/b-emu-socket-that-does-not-exist");
         assert_eq!(
-            socket_path_from_values(
-                Some(path.as_os_str().to_os_string()),
-                None
-            ),
+            socket_path_from_values(Some(path.as_os_str().to_os_string()), None),
             Err(WaylandError::SocketNotFound(path))
         );
     }
@@ -218,10 +210,7 @@ mod tests {
         std::fs::write(&file, b"not a socket").unwrap();
 
         assert_eq!(
-            socket_path_from_values(
-                Some(file.as_os_str().to_os_string()),
-                None
-            ),
+            socket_path_from_values(Some(file.as_os_str().to_os_string()), None),
             Err(WaylandError::SocketNotSocket(file))
         );
     }
