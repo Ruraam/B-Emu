@@ -21,3 +21,6 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the architecture and [docs/
 ## Status
 
 Phase 0 prototype is in progress on the `phase-0-wayland-prototype` branch. CI is being used to validate the Wayland-only dependency graph and Linux build before the full interface is developed.
+
+
+Deployment requirements and the planned rootless ULPM `.lpk` distribution model are documented in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
