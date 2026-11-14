@@ -20,7 +20,9 @@ pub enum PathsError {
 impl std::fmt::Display for PathsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::MissingHome => write!(f, "HOME is not set; cannot determine user data directories"),
+            Self::MissingHome => {
+                write!(f, "HOME is not set; cannot determine user data directories")
+            }
             Self::RelativeXdgPath(name) => write!(
                 f,
                 "{name} must be an absolute path when it is used by B-Emu"
@@ -106,7 +108,7 @@ fn absolute_path(name: &'static str, path: PathBuf) -> Result<PathBuf, PathsErro
 
 #[cfg(test)]
 mod tests {
-    use super::{AppPaths, APP_ID};
+    use super::{APP_ID, AppPaths};
 
     #[test]
     fn app_id_is_stable() {
@@ -122,8 +124,12 @@ mod tests {
             runtime_dir: None,
         };
 
-        assert!(paths.writable_dirs().iter().all(|path| path.ends_with(APP_ID)));
+        assert!(
+            paths
+                .writable_dirs()
+                .iter()
+                .all(|path| path.ends_with(APP_ID))
+        );
     }
 
-    use std::path::PathBuf;
 }
