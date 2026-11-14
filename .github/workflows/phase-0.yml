@@ -50,7 +50,10 @@ jobs:
       - name: Run unit tests
         run: cargo test --all-targets
 
-      - name: Verify native Wayland connection with Weston headless
+      - name: Build B-Emu executable
+        run: cargo build --bin b-emu
+
+      - name: Verify native Wayland connection and B-Emu startup with Weston headless
         shell: bash
         run: |
           set -euo pipefail
@@ -96,3 +99,18 @@ jobs:
           wayland-info > "$RUNNER_TEMP/wayland-info.log"
           grep -q "wl_compositor" "$RUNNER_TEMP/wayland-info.log"
           echo "A native Wayland client connected to Weston and completed registry discovery."
+
+          set +e
+          env -u DISPLAY LIBGL_ALWAYS_SOFTWARE=1 \
+            timeout --signal=TERM --kill-after=2s 5s \
+            ./target/debug/b-emu > "$RUNNER_TEMP/b-emu.log" 2>&1
+          app_status=$?
+          set -e
+
+          if [[ "$app_status" -ne 124 ]]; then
+            cat "$RUNNER_TEMP/b-emu.log"
+            echo "B-Emu did not remain running under the headless Wayland compositor (exit: $app_status)." >&2
+            exit 1
+          fi
+
+          echo "B-Emu remained running for the smoke-test window under native Wayland."
