@@ -1,8 +1,10 @@
+use b_emu::wayland;
+
 slint::include_modules!();
 
 fn main() {
-    if std::env::var_os("WAYLAND_DISPLAY").is_none() {
-        eprintln!("B-Emu requires a native Wayland session. X11 and XWayland are not supported.");
+    if let Err(error) = wayland::wayland_socket_from_env() {
+        eprintln!("B-Emu requires a usable native Wayland session: {error}");
         std::process::exit(1);
     }
 
