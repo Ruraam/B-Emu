@@ -132,5 +132,4 @@ mod tests {
                 .all(|path| path.ends_with(APP_ID))
         );
     }
-
 }
