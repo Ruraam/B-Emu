@@ -52,18 +52,13 @@ impl AppPaths {
         cache: Option<OsString>,
         runtime: Option<OsString>,
     ) -> Result<Self, PathsError> {
-        let home = home
-            .map(PathBuf::from)
-            .ok_or(PathsError::MissingHome)?;
+        let home = home.map(PathBuf::from).ok_or(PathsError::MissingHome)?;
         let home = absolute_path("HOME", home)?;
 
         Ok(Self {
-            config_dir: xdg_path(config, home.join(".config"), "XDG_CONFIG_HOME")?
-                .join(APP_ID),
-            data_dir: xdg_path(data, home.join(".local/share"), "XDG_DATA_HOME")?
-                .join(APP_ID),
-            cache_dir: xdg_path(cache, home.join(".cache"), "XDG_CACHE_HOME")?
-                .join(APP_ID),
+            config_dir: xdg_path(config, home.join(".config"), "XDG_CONFIG_HOME")?.join(APP_ID),
+            data_dir: xdg_path(data, home.join(".local/share"), "XDG_DATA_HOME")?.join(APP_ID),
+            cache_dir: xdg_path(cache, home.join(".cache"), "XDG_CACHE_HOME")?.join(APP_ID),
             runtime_dir: runtime
                 .map(|value| absolute_path("XDG_RUNTIME_DIR", PathBuf::from(value)))
                 .transpose()?
@@ -128,7 +123,10 @@ mod tests {
 
     #[test]
     fn missing_home_is_rejected() {
-        assert_eq!(values(None, None, None, None, None), Err(PathsError::MissingHome));
+        assert_eq!(
+            values(None, None, None, None, None),
+            Err(PathsError::MissingHome)
+        );
     }
 
     #[test]
@@ -196,9 +194,11 @@ mod tests {
     fn writable_dirs_are_user_scoped_children() {
         let paths = values(Some("/home/test"), None, None, None, None).unwrap();
 
-        assert!(paths
-            .writable_dirs()
-            .iter()
-            .all(|path| path.ends_with(APP_ID)));
+        assert!(
+            paths
+                .writable_dirs()
+                .iter()
+                .all(|path| path.ends_with(APP_ID))
+        );
     }
 }
