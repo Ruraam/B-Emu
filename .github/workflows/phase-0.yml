@@ -1,0 +1,45 @@
+name: Phase 0 — Wayland prototype
+
+on:
+  push:
+    branches:
+      - main
+      - phase-0-wayland-prototype
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  linux-wayland:
+    name: Linux / Wayland-only build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            pkg-config \
+            libwayland-dev \
+            libxkbcommon-dev \
+            libegl1-mesa-dev \
+            libgl1-mesa-dev
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Audit backend features (X11 must be absent)
+        run: bash scripts/check-wayland-features.sh
+
+      - name: Compile all targets
+        run: cargo check --all-targets
