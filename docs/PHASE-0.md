@@ -28,7 +28,8 @@ The `.github/workflows/phase-0.yml` workflow:
 
 - checks Rust formatting;
 - inspects Cargo's resolved feature graph and rejects known X11 backend features;
-- compiles all Rust targets on Ubuntu with Wayland/OpenGL development libraries.
+- compiles all Rust targets on Ubuntu with Wayland/OpenGL development libraries;
+- runs all unit tests with `cargo test --all-targets`, including deterministic XDG path tests and Unix Wayland socket path tests.
 
 The feature audit is a guard, not a substitute for a runtime test on a real Wayland compositor.
 
