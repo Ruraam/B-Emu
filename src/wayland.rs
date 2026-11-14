@@ -1,6 +1,6 @@
 use std::env;
-use std::path::PathBuf;
 use std::os::unix::fs::FileTypeExt;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WaylandError {
