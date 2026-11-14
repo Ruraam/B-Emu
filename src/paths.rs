@@ -109,6 +109,7 @@ fn absolute_path(name: &'static str, path: PathBuf) -> Result<PathBuf, PathsErro
 #[cfg(test)]
 mod tests {
     use super::{APP_ID, AppPaths};
+    use std::path::PathBuf;
 
     #[test]
     fn app_id_is_stable() {
