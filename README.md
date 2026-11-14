@@ -16,8 +16,8 @@ It aims to provide a modern, controller-first library for discovering, organizin
 
 ## Architecture
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the initial architecture and implementation boundaries.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the architecture and [docs/PHASE-0.md](docs/PHASE-0.md) for the Wayland prototype, renderer policy, and acceptance tests.
 
 ## Status
 
-Early architecture phase. The repository is being prepared before implementation begins.
+Phase 0 prototype is in progress on the `phase-0-wayland-prototype` branch. CI is being used to validate the Wayland-only dependency graph and Linux build before the full interface is developed.
