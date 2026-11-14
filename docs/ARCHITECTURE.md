@@ -19,10 +19,14 @@ Explicit non-goals:
 - No Windows or macOS target in the initial architecture.
 - No Kodi integration.
 - No modifications to BubbleOS, BubbleTerm, or BubbleWM.
+- No dependency on BubbleWM IPC, BubbleOS services, or compositor-private protocols for normal application operation.
+- No privileged installation, system daemon, setuid helper, or root requirement.
 - No shared theme/runtime repository requirement.
 - No invented emulator settings: each integration exposes only settings supported by the detected emulator and version.
 
 B-Emu may use BubbleOS artwork as a visual reference for its own palette. This is a design choice, not a technical dependency.
+
+B-Emu is a standard Wayland client. BubbleWM is a first-class development and validation environment, but any compatible Wayland compositor must be able to host the same standalone application build. The rootless installation, XDG data locations, and ULPM `.lpk` release contract are defined in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## 2. High-level components
 
@@ -223,7 +227,8 @@ Use restrained glass surfaces, readable typography, clear focus states, and moti
 - Wayland-only build verification.
 - Crash-safe database updates.
 - Security review of process launch and file handling.
-- Packaging for Linux distributions.
+- Build, sign, install, update, roll back, and uninstall architecture-specific ULPM `.lpk` packages without root.
+- Validate the same package on BubbleWM and at least one independent Wayland compositor.
 
 ## 11. Architecture acceptance criteria
 
@@ -236,3 +241,11 @@ The architecture is not considered validated until:
 5. Renderer selection and fallback are observable in logs.
 6. The UI can be navigated without a mouse.
 7. A fake/test emulator adapter can be launched safely without shell command concatenation.
+
+## 12. BubbleWM and deployment independence
+
+- B-Emu communicates with the compositor through standard Wayland client protocols provided by its Wayland backend.
+- Do not add a dependency on the BubbleWM workspace IPC crate for window creation, input, focus, or rendering.
+- BubbleWM may be used for nested development and integration tests, but it is not required at build time or runtime.
+- All mutable application state belongs in user-owned XDG directories; the executable and packaged payload must be treated as read-only.
+- ULPM packaging is a release target, not a dependency of the development binary. The exact package manifest and permission declarations must be validated against the target ULPM implementation before release.
