@@ -26,7 +26,9 @@ jobs:
             libxkbcommon-dev \
             libegl1-mesa-dev \
             libgl1-mesa-dev \
-            libfontconfig1-dev
+            libfontconfig1-dev \
+            weston \
+            wayland-utils
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,3 +49,50 @@ jobs:
 
       - name: Run unit tests
         run: cargo test --all-targets
+
+      - name: Verify native Wayland connection with Weston headless
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          export XDG_RUNTIME_DIR="$RUNNER_TEMP/b-emu-runtime"
+          export WAYLAND_DISPLAY="wayland-b-emu-test"
+          mkdir -p "$XDG_RUNTIME_DIR"
+          chmod 700 "$XDG_RUNTIME_DIR"
+
+          weston \
+            --backend=headless \
+            --renderer=pixman \
+            --socket="$WAYLAND_DISPLAY" \
+            --idle-time=0 \
+            --no-config \
+            --log="$RUNNER_TEMP/weston.log" &
+          weston_pid=$!
+
+          cleanup() {
+            kill "$weston_pid" 2>/dev/null || true
+            wait "$weston_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for attempt in $(seq 1 50); do
+            if [[ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]]; then
+              break
+            fi
+            if ! kill -0 "$weston_pid" 2>/dev/null; then
+              cat "$RUNNER_TEMP/weston.log"
+              echo "Weston exited before creating its Wayland socket." >&2
+              exit 1
+            fi
+            sleep 0.1
+          done
+
+          if [[ ! -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]]; then
+            cat "$RUNNER_TEMP/weston.log"
+            echo "Weston did not create the expected Wayland socket." >&2
+            exit 1
+          fi
+
+          wayland-info > "$RUNNER_TEMP/wayland-info.log"
+          grep -q "wl_compositor" "$RUNNER_TEMP/wayland-info.log"
+          echo "A native Wayland client connected to Weston and completed registry discovery."
