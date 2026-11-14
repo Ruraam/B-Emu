@@ -1,5 +1,6 @@
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use std::os::unix::fs::FileTypeExt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WaylandError {
@@ -26,10 +27,9 @@ impl std::fmt::Display for WaylandError {
                 f,
                 "XDG_RUNTIME_DIR is not set; cannot locate the Wayland socket"
             ),
-            Self::InvalidRuntimeDir => write!(
-                f,
-                "XDG_RUNTIME_DIR must be an absolute directory"
-            ),
+            Self::InvalidRuntimeDir => {
+                write!(f, "XDG_RUNTIME_DIR must be an absolute directory")
+            }
             Self::SocketNotFound(path) => write!(
                 f,
                 "Wayland socket does not exist or is inaccessible: {}",
@@ -78,7 +78,7 @@ pub fn wayland_socket_from_env() -> Result<PathBuf, WaylandError> {
 }
 
 #[cfg(test)]
-pub fn validate_socket_path(path: &Path) -> Result<(), WaylandError> {
+pub fn validate_socket_path(path: &std::path::Path) -> Result<(), WaylandError> {
     let metadata = path
         .symlink_metadata()
         .map_err(|_| WaylandError::SocketNotFound(path.to_path_buf()))?;
