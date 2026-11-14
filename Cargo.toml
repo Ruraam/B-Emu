@@ -8,6 +8,7 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 slint = { version = "~1.18.1", default-features = false, features = [
+    "compat-1-18",
     "backend-winit-wayland",
     "renderer-femtovg",
     "renderer-software",
