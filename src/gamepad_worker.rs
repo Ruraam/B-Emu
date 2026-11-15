@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use b_emu::input::{GamepadEvent, GamepadInput, navigation::apply_sidebar_action};
+use b_emu::input::{GamepadAction, GamepadEvent, GamepadInput, navigation::apply_sidebar_action};
 
 use crate::MainWindow;
 
@@ -71,6 +71,8 @@ fn run_worker(window: slint::Weak<MainWindow>, stop_rx: Receiver<()>) {
             Err(TryRecvError::Empty) => {}
         }
 
+        let mut actions = Vec::new();
+
         for event in input.poll_events() {
             match event {
                 GamepadEvent::Connected(gamepad) => eprintln!(
@@ -80,23 +82,32 @@ fn run_worker(window: slint::Weak<MainWindow>, stop_rx: Receiver<()>) {
                 GamepadEvent::Disconnected { id } => {
                     eprintln!("[b-emu] controller disconnected (id {id})");
                 }
-                GamepadEvent::Action { id, action } => {
-                    let result = window.upgrade_in_event_loop(move |ui| {
-                        let (focused_page, active_page) = apply_sidebar_action(
-                            ui.get_focused_page(),
-                            ui.get_active_page(),
-                            action,
-                        );
-                        ui.set_focused_page(focused_page);
-                        ui.set_active_page(active_page);
-                    });
+                GamepadEvent::Action { id, action } => actions.push((id, action)),
+            }
+        }
 
-                    if let Err(error) = result {
-                        eprintln!(
-                            "[b-emu] could not dispatch controller action from id {id}: {error}"
-                        );
-                    }
+        // Queue at most one UI callback per polling batch. This preserves
+        // action order while preventing rapid input from flooding Slint's
+        // event queue with one callback per low-level controller event.
+        if !actions.is_empty() {
+            let action_count = actions.len();
+            let result = window.upgrade_in_event_loop(move |ui| {
+                let mut focused_page = ui.get_focused_page();
+                let mut active_page = ui.get_active_page();
+
+                for (_, action) in actions {
+                    (focused_page, active_page) =
+                        apply_sidebar_action(focused_page, active_page, action);
                 }
+
+                ui.set_focused_page(focused_page);
+                ui.set_active_page(active_page);
+            });
+
+            if let Err(error) = result {
+                eprintln!(
+                    "[b-emu] could not dispatch batch of {action_count} controller actions: {error}"
+                );
             }
         }
 
