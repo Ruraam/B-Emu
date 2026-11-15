@@ -1,0 +1,31 @@
+import { Theme } from "../theme.slint";
+
+export component PageHeader inherits VerticalLayout {
+    in property<string> eyebrow: "B-EMU / FRONTEND";
+    in property<string> title: "Accueil";
+    in property<string> subtitle: "";
+
+    spacing: 7px;
+
+    Text {
+        text: root.eyebrow;
+        color: Theme.accent-indigo;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 2px;
+    }
+
+    Text {
+        text: root.title;
+        color: Theme.text-primary;
+        font-size: 30px;
+        font-weight: 800;
+    }
+
+    Text {
+        text: root.subtitle;
+        color: Theme.text-secondary;
+        font-size: 14px;
+        wrap: word-wrap;
+    }
+}
