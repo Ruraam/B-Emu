@@ -1,67 +1,226 @@
-import { Button, VerticalBox } from "std-widgets.slint";
+import { HorizontalLayout, VerticalLayout } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { GlassPanel } from "components/glass-panel.slint";
+import { PageHeader } from "components/page-header.slint";
+import { SidebarItem } from "components/sidebar-item.slint";
 
 export component MainWindow inherits Window {
+    in-out property<int> active-page: 0;
+
     title: "B-Emu";
     min-width: 900px;
     min-height: 560px;
     preferred-width: 1100px;
     preferred-height: 700px;
-    background: #020617;
+    background: Theme.background;
 
-    VerticalBox {
-        padding: 32px;
-        spacing: 18px;
-
-        Text {
-            text: "B-Emu";
-            color: #67E8F9;
-            font-size: 42px;
-            font-weight: 800;
-        }
-
-        Text {
-            text: "EMULATION FRONTEND";
-            color: #818CF8;
-            font-size: 13px;
-            letter-spacing: 3px;
-        }
+    HorizontalLayout {
+        spacing: 0px;
 
         Rectangle {
-            background: #0A1530;
-            border-radius: 18px;
-            border-width: 1px;
-            border-color: #1E3A5F;
-            VerticalBox {
-                padding: 28px;
+            width: 228px;
+            background: Theme.sidebar;
+            border-width: 0px;
+            border-color: Theme.border;
+
+            VerticalLayout {
+                padding: 22px;
                 spacing: 12px;
+
                 Text {
-                    text: "Wayland session active";
-                    color: #A5F3FC;
-                    font-size: 24px;
+                    text: "B-Emu";
+                    color: Theme.accent-cyan;
+                    font-size: 30px;
+                    font-weight: 800;
+                }
+
+                Text {
+                    text: "EMULATION FRONTEND";
+                    color: Theme.accent-indigo;
+                    font-size: 10px;
                     font-weight: 700;
+                    letter-spacing: 2px;
                 }
-                Text {
-                    text: "Phase 0 prototype — native Wayland backend";
-                    color: #E0F2FE;
-                    font-size: 16px;
+
+                Rectangle {
+                    height: 1px;
+                    background: Theme.border;
                 }
+
                 Text {
-                    text: "Renderer selection: FemtoVG (GPU) with software fallback available.";
-                    color: #7DD3FC;
-                    font-size: 14px;
+                    text: "NAVIGATION";
+                    color: Theme.text-muted;
+                    font-size: 10px;
+                    font-weight: 700;
+                    letter-spacing: 1.5px;
+                }
+
+                SidebarItem {
+                    label: "Accueil";
+                    selected: root.active-page == 0;
+                    focused: root.active-page == 0;
+                    activated => { root.active-page = 0; }
+                }
+
+                SidebarItem {
+                    label: "Systèmes";
+                    selected: root.active-page == 1;
+                    focused: root.active-page == 1;
+                    activated => { root.active-page = 1; }
+                }
+
+                SidebarItem {
+                    label: "Bibliothèque";
+                    selected: root.active-page == 2;
+                    focused: root.active-page == 2;
+                    activated => { root.active-page = 2; }
+                }
+
+                SidebarItem {
+                    label: "Émulateurs";
+                    selected: root.active-page == 3;
+                    focused: root.active-page == 3;
+                    activated => { root.active-page = 3; }
+                }
+
+                SidebarItem {
+                    label: "Paramètres";
+                    selected: root.active-page == 4;
+                    focused: root.active-page == 4;
+                    activated => { root.active-page = 4; }
+                }
+
+                Rectangle {
+                    vertical-stretch: 1;
+                    background: transparent;
+                }
+
+                Text {
+                    text: "PHASE 1 / APP SHELL";
+                    color: Theme.text-muted;
+                    font-size: 10px;
+                    letter-spacing: 1px;
+                }
+
+                Text {
+                    text: "Wayland native";
+                    color: Theme.accent-blue;
+                    font-size: 12px;
                 }
             }
         }
 
-        Button {
-            text: "Prototype ready";
-            enabled: false;
-        }
+        Rectangle {
+            horizontal-stretch: 1;
+            background: Theme.background-raised;
 
-        Text {
-            text: "B-Emu is an independent project. No other Bubble project is required.";
-            color: #64748B;
-            font-size: 12px;
+            VerticalLayout {
+                padding: 34px;
+                spacing: 24px;
+
+                PageHeader {
+                    eyebrow: "B-EMU / PHASE 1";
+                    title: root.active-page == 0 ? "Accueil"
+                        : root.active-page == 1 ? "Systèmes"
+                        : root.active-page == 2 ? "Bibliothèque"
+                        : root.active-page == 3 ? "Émulateurs"
+                        : "Paramètres";
+                    subtitle: "Votre univers de jeu, organisé dans une interface native Wayland.";
+                }
+
+                GlassPanel {
+                    preferred-height: 190px;
+
+                    Text {
+                        text: "CYBERPUNK GLASS";
+                        color: Theme.accent-cyan;
+                        font-size: 11px;
+                        font-weight: 700;
+                        letter-spacing: 2px;
+                    }
+
+                    Text {
+                        text: "Le shell B-Emu prend forme.";
+                        color: Theme.text-primary;
+                        font-size: 23px;
+                        font-weight: 700;
+                    }
+
+                    Text {
+                        text: "Surfaces translucides, profondeur visuelle et accents néon. Le véritable flou Dual Kawase sera intégré séparément dans le pipeline graphique : cette première étape ne le simule pas.";
+                        color: Theme.text-secondary;
+                        font-size: 14px;
+                        wrap: word-wrap;
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 16px;
+
+                    GlassPanel {
+                        horizontal-stretch: 1;
+                        preferred-height: 118px;
+
+                        Text {
+                            text: "RENDU";
+                            color: Theme.accent-indigo;
+                            font-size: 10px;
+                            font-weight: 700;
+                            letter-spacing: 1.5px;
+                        }
+
+                        Text {
+                            text: "FemtoVG / Software";
+                            color: Theme.text-primary;
+                            font-size: 16px;
+                            font-weight: 700;
+                        }
+
+                        Text {
+                            text: "Backend Wayland inchangé";
+                            color: Theme.text-muted;
+                            font-size: 12px;
+                        }
+                    }
+
+                    GlassPanel {
+                        horizontal-stretch: 1;
+                        preferred-height: 118px;
+
+                        Text {
+                            text: "ÉTAT DU PROJET";
+                            color: Theme.accent-indigo;
+                            font-size: 10px;
+                            font-weight: 700;
+                            letter-spacing: 1.5px;
+                        }
+
+                        Text {
+                            text: "Phase 1 — Shell";
+                            color: Theme.text-primary;
+                            font-size: 16px;
+                            font-weight: 700;
+                        }
+
+                        Text {
+                            text: "Aucune logique d'émulation ajoutée";
+                            color: Theme.text-muted;
+                            font-size: 12px;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    vertical-stretch: 1;
+                    background: transparent;
+                }
+
+                Text {
+                    text: "B-Emu est autonome : BubbleWM n'est pas une dépendance.";
+                    color: Theme.text-muted;
+                    font-size: 11px;
+                }
+            }
         }
     }
 }
