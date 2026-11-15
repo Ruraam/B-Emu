@@ -5,6 +5,9 @@ import { SidebarItem } from "components/sidebar-item.slint";
 
 export component MainWindow inherits Window {
     in-out property<int> active-page: 0;
+    in-out property<int> focused-page: 0;
+
+    forward-focus: navigation-focus;
 
     title: "B-Emu";
     min-width: 900px;
@@ -22,89 +25,137 @@ export component MainWindow inherits Window {
             border-width: 0px;
             border-color: Theme.border;
 
-            VerticalLayout {
-                padding: 22px;
-                spacing: 12px;
+            navigation-focus := FocusScope {
+                width: parent.width;
+                height: parent.height;
 
-                Text {
-                    text: "B-Emu";
-                    color: Theme.accent-cyan;
-                    font-size: 30px;
-                    font-weight: 800;
+                VerticalLayout {
+                    padding: 22px;
+                    spacing: 12px;
+
+                    Text {
+                        text: "B-Emu";
+                        color: Theme.accent-cyan;
+                        font-size: 30px;
+                        font-weight: 800;
+                    }
+
+                    Text {
+                        text: "EMULATION FRONTEND";
+                        color: Theme.accent-indigo;
+                        font-size: 10px;
+                        font-weight: 700;
+                        letter-spacing: 2px;
+                    }
+
+                    Rectangle {
+                        height: 1px;
+                        background: Theme.border;
+                    }
+
+                    Text {
+                        text: "NAVIGATION";
+                        color: Theme.text-muted;
+                        font-size: 10px;
+                        font-weight: 700;
+                        letter-spacing: 1.5px;
+                    }
+
+                    SidebarItem {
+                        label: "Accueil";
+                        selected: root.active-page == 0;
+                        focused: root.focused-page == 0;
+                        activated => {
+                            root.focused-page = 0;
+                            root.active-page = 0;
+                        }
+                    }
+
+                    SidebarItem {
+                        label: "Systèmes";
+                        selected: root.active-page == 1;
+                        focused: root.focused-page == 1;
+                        activated => {
+                            root.focused-page = 1;
+                            root.active-page = 1;
+                        }
+                    }
+
+                    SidebarItem {
+                        label: "Bibliothèque";
+                        selected: root.active-page == 2;
+                        focused: root.focused-page == 2;
+                        activated => {
+                            root.focused-page = 2;
+                            root.active-page = 2;
+                        }
+                    }
+
+                    SidebarItem {
+                        label: "Émulateurs";
+                        selected: root.active-page == 3;
+                        focused: root.focused-page == 3;
+                        activated => {
+                            root.focused-page = 3;
+                            root.active-page = 3;
+                        }
+                    }
+
+                    SidebarItem {
+                        label: "Paramètres";
+                        selected: root.active-page == 4;
+                        focused: root.focused-page == 4;
+                        activated => {
+                            root.focused-page = 4;
+                            root.active-page = 4;
+                        }
+                    }
+
+                    Rectangle {
+                        vertical-stretch: 1;
+                        background: transparent;
+                    }
+
+                    Text {
+                        text: "↑ ↓ NAVIGUER  ·  ENTRÉE VALIDER";
+                        color: Theme.text-muted;
+                        font-size: 9px;
+                        letter-spacing: 0.5px;
+                    }
+
+                    Text {
+                        text: "PHASE 1 / APP SHELL";
+                        color: Theme.text-muted;
+                        font-size: 10px;
+                        letter-spacing: 1px;
+                    }
+
+                    Text {
+                        text: "Wayland native";
+                        color: Theme.accent-blue;
+                        font-size: 12px;
+                    }
                 }
 
-                Text {
-                    text: "EMULATION FRONTEND";
-                    color: Theme.accent-indigo;
-                    font-size: 10px;
-                    font-weight: 700;
-                    letter-spacing: 2px;
-                }
-
-                Rectangle {
-                    height: 1px;
-                    background: Theme.border;
-                }
-
-                Text {
-                    text: "NAVIGATION";
-                    color: Theme.text-muted;
-                    font-size: 10px;
-                    font-weight: 700;
-                    letter-spacing: 1.5px;
-                }
-
-                SidebarItem {
-                    label: "Accueil";
-                    selected: root.active-page == 0;
-                    focused: root.active-page == 0;
-                    activated => { root.active-page = 0; }
-                }
-
-                SidebarItem {
-                    label: "Systèmes";
-                    selected: root.active-page == 1;
-                    focused: root.active-page == 1;
-                    activated => { root.active-page = 1; }
-                }
-
-                SidebarItem {
-                    label: "Bibliothèque";
-                    selected: root.active-page == 2;
-                    focused: root.active-page == 2;
-                    activated => { root.active-page = 2; }
-                }
-
-                SidebarItem {
-                    label: "Émulateurs";
-                    selected: root.active-page == 3;
-                    focused: root.active-page == 3;
-                    activated => { root.active-page = 3; }
-                }
-
-                SidebarItem {
-                    label: "Paramètres";
-                    selected: root.active-page == 4;
-                    focused: root.active-page == 4;
-                    activated => { root.active-page = 4; }
-                }
-
-                Rectangle {
-                    vertical-stretch: 1;
-                    background: transparent;
-                }
-
-                Text {
-                    text: "PHASE 1 / APP SHELL";
-                    color: Theme.text-muted;
-                    font-size: 10px;
-                    letter-spacing: 1px;
-                }
-
-                Text {
-                    text: "Wayland native";
-                    color: Theme.accent-blue;
-                    font-size: 12px;
+                key-pressed(event) => {
+                    if (event.text == Key.DownArrow || event.text == Key.PageDown) {
+                        root.focused-page = root.focused-page == 4 ? 0 : root.focused-page + 1;
+                        accept
+                    } else if (event.text == Key.UpArrow || event.text == Key.PageUp) {
+                        root.focused-page = root.focused-page == 0 ? 4 : root.focused-page - 1;
+                        accept
+                    } else if (event.text == Key.Home) {
+                        root.focused-page = 0;
+                        accept
+                    } else if (event.text == Key.End) {
+                        root.focused-page = 4;
+                        accept
+                    } else if (event.text == Key.Return || event.text == Key.Space) {
+                        root.active-page = root.focused-page;
+                        accept
+                    } else {
+                        reject
+                    }
                 }
             }
         }
