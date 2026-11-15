@@ -51,8 +51,8 @@ pub struct GamepadInput {
 
 impl GamepadInput {
     pub fn new() -> Result<Self, GamepadError> {
-        let gilrs = Gilrs::new()
-            .map_err(|error| GamepadError::Initialization(format!("{error:?}")))?;
+        let gilrs =
+            Gilrs::new().map_err(|error| GamepadError::Initialization(format!("{error:?}")))?;
 
         Ok(Self {
             gilrs,
@@ -101,11 +101,8 @@ impl GamepadInput {
                     }
                 }
                 EventType::AxisChanged(axis, value, _) => {
-                    if let Some(action) = self
-                        .axis_states
-                        .entry(id)
-                        .or_default()
-                        .update(axis, value)
+                    if let Some(action) =
+                        self.axis_states.entry(id).or_default().update(axis, value)
                     {
                         translated.push(GamepadEvent::Action {
                             id: numeric_id,
