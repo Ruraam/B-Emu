@@ -9,6 +9,7 @@ on:
   pull_request:
     branches:
       - main
+      - phase-0-wayland-prototype
 
 permissions:
   contents: read
