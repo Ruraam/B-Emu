@@ -13,6 +13,8 @@ on:
       - main
       - phase-0-wayland-prototype
       - phase-1-app-shell
+      - phase-1-navigation
+      - phase-1-gamepad-input
 
 permissions:
   contents: read
