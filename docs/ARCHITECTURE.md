@@ -160,15 +160,11 @@ The first adapters should be selected based on availability and testability on D
 
 The interface is controller-first but remains fully usable with a mouse and keyboard.
 
-The input service owns:
+The input service owns controller discovery and hotplug through GilRs, button/axis normalization, and controller disconnect handling. Polling runs on a dedicated thread and reaches Slint only through `Weak::upgrade_in_event_loop`; the UI thread is never blocked by evdev polling. The worker is stopped and joined when the main window exits.
 
-- Controller discovery and hotplug.
-- Button and axis mapping.
-- Configurable navigation bindings.
-- Focus movement and activation.
-- Clear handling of controller disconnects.
+The current shell maps vertical navigation, confirm, and back-to-home. Horizontal actions are normalized for later screens but do not change the vertical sidebar. Analog navigation uses activation and return thresholds to avoid jitter.
 
-Input events are translated into application-level actions so that the UI is not tied to a specific controller model.
+Access remains rootless and follows the active Linux seat/session ACL policy. B-Emu never changes `/dev/input` permissions, adds the user to the `input` group, or requests root. If access is unavailable, the gamepad worker reports it and keyboard/mouse input remains available. See [GAMEPAD.md](GAMEPAD.md) for the mapping and runtime details.
 
 ## 9. Visual direction
 

@@ -1,5 +1,7 @@
 use b_emu::wayland;
 
+mod gamepad_worker;
+
 slint::include_modules!();
 
 fn main() {
@@ -16,5 +18,13 @@ fn main() {
 
 fn run() -> Result<(), slint::PlatformError> {
     let window = MainWindow::new()?;
+    let _gamepad_worker = match gamepad_worker::GamepadWorker::start(window.as_weak()) {
+        Ok(worker) => Some(worker),
+        Err(error) => {
+            eprintln!("[b-emu] could not start gamepad worker: {error}");
+            None
+        }
+    };
+
     window.run()
 }
