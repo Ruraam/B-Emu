@@ -7,6 +7,7 @@ description = "Native Wayland frontend for B-Emu"
 license = "GPL-3.0-or-later"
 
 [dependencies]
+gilrs = "=0.11.2"
 slint = { version = "~1.18.1", default-features = false, features = [
     "compat-1-18",
     "backend-winit-wayland",
