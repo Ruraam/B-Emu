@@ -19,9 +19,7 @@ pub fn apply_sidebar_action(
         GamepadAction::NavigateDown => ((focused_page + 1) % 5, active_page),
         GamepadAction::Confirm => (focused_page, focused_page),
         GamepadAction::Back => (0, 0),
-        GamepadAction::NavigateLeft | GamepadAction::NavigateRight => {
-            (focused_page, active_page)
-        }
+        GamepadAction::NavigateLeft | GamepadAction::NavigateRight => (focused_page, active_page),
     }
 }
 
@@ -44,10 +42,7 @@ mod tests {
 
     #[test]
     fn confirm_activates_the_focused_page() {
-        assert_eq!(
-            apply_sidebar_action(3, 1, GamepadAction::Confirm),
-            (3, 3)
-        );
+        assert_eq!(apply_sidebar_action(3, 1, GamepadAction::Confirm), (3, 3));
     }
 
     #[test]
@@ -69,9 +64,6 @@ mod tests {
 
     #[test]
     fn invalid_page_indices_are_normalized() {
-        assert_eq!(
-            apply_sidebar_action(-1, 7, GamepadAction::Confirm),
-            (4, 4)
-        );
+        assert_eq!(apply_sidebar_action(-1, 7, GamepadAction::Confirm), (4, 4));
     }
 }
