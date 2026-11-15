@@ -7,11 +7,14 @@ on:
       - phase-0-wayland-prototype
       - phase-1-app-shell
       - phase-1-navigation
+      - phase-1-gamepad-input
   pull_request:
     branches:
       - main
       - phase-0-wayland-prototype
       - phase-1-app-shell
+      - phase-1-navigation
+      - phase-1-gamepad-input
 
 permissions:
   contents: read
@@ -26,6 +29,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes \
             pkg-config \
+            libudev-dev \
             libwayland-dev \
             libxkbcommon-dev \
             libegl1-mesa-dev \
