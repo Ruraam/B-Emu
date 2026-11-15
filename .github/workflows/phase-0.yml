@@ -6,10 +6,12 @@ on:
       - main
       - phase-0-wayland-prototype
       - phase-1-app-shell
+      - phase-1-navigation
   pull_request:
     branches:
       - main
       - phase-0-wayland-prototype
+      - phase-1-app-shell
 
 permissions:
   contents: read
