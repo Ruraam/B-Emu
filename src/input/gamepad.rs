@@ -186,20 +186,22 @@ impl AxisState {
                 GamepadAction::NavigateLeft,
                 GamepadAction::NavigateRight,
             ),
+            // GilRs normalizes stick Y so positive values point up.
             Axis::LeftStickY => (
                 &mut self.left_y,
-                GamepadAction::NavigateUp,
                 GamepadAction::NavigateDown,
+                GamepadAction::NavigateUp,
             ),
             Axis::DPadX => (
                 &mut self.dpad_x,
                 GamepadAction::NavigateLeft,
                 GamepadAction::NavigateRight,
             ),
+            // GilRs normalizes D-pad Y so positive values point up as well.
             Axis::DPadY => (
                 &mut self.dpad_y,
-                GamepadAction::NavigateUp,
                 GamepadAction::NavigateDown,
+                GamepadAction::NavigateUp,
             ),
             _ => return None,
         };
@@ -277,7 +279,7 @@ mod tests {
         let mut state = AxisState::default();
 
         assert_eq!(
-            state.update(Axis::LeftStickY, -0.8),
+            state.update(Axis::LeftStickY, 0.8),
             Some(GamepadAction::NavigateUp)
         );
         assert_eq!(
@@ -291,7 +293,7 @@ mod tests {
         let mut state = AxisState::default();
 
         assert_eq!(
-            state.update(Axis::DPadY, 0.8),
+            state.update(Axis::DPadY, -0.8),
             Some(GamepadAction::NavigateDown)
         );
         assert_eq!(
@@ -305,9 +307,9 @@ mod tests {
         let mut state = AxisState::default();
 
         assert_eq!(
-            state.update(Axis::LeftStickY, -0.8),
+            state.update(Axis::LeftStickY, 0.8),
             Some(GamepadAction::NavigateUp)
         );
-        assert_eq!(state.update(Axis::LeftStickY, -0.1), None);
+        assert_eq!(state.update(Axis::LeftStickY, 0.1), None);
     }
 }
