@@ -41,7 +41,7 @@ pub enum GamepadEvent {
 
 /// Non-blocking gamepad event source.
 ///
-/// Call poll_events regularly from the application event loop. GilRs handles
+/// Call poll_events regularly from the dedicated input worker. GilRs handles
 /// Linux evdev discovery and hotplugging; this type translates its normalized
 /// events into B-Emu actions.
 pub struct GamepadInput {
