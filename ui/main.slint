@@ -138,10 +138,10 @@ export component MainWindow inherits Window {
                 }
 
                 key-pressed(event) => {
-                    if (event.text == Key.Down || event.text == Key.PageDown) {
+                    if (event.text == Key.DownArrow || event.text == Key.PageDown) {
                         root.focused-page = root.focused-page == 4 ? 0 : root.focused-page + 1;
                         accept
-                    } else if (event.text == Key.Up || event.text == Key.PageUp) {
+                    } else if (event.text == Key.UpArrow || event.text == Key.PageUp) {
                         root.focused-page = root.focused-page == 0 ? 4 : root.focused-page - 1;
                         accept
                     } else if (event.text == Key.Home) {
@@ -153,6 +153,8 @@ export component MainWindow inherits Window {
                     } else if (event.text == Key.Return || event.text == Key.Space) {
                         root.active-page = root.focused-page;
                         accept
+                    } else {
+                        reject
                     }
                 }
             }
