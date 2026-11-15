@@ -106,8 +106,9 @@ fn run_worker(window: slint::Weak<MainWindow>, stop_rx: Receiver<()>) {
 
             if let Err(error) = result {
                 eprintln!(
-                    "[b-emu] could not dispatch batch of {action_count} controller actions: {error}"
+                    "[b-emu] could not dispatch batch of {action_count} controller actions: {error}; stopping worker"
                 );
+                break;
             }
         }
 
