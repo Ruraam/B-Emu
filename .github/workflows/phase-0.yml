@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - phase-0-wayland-prototype
+      - phase-1-app-shell
   pull_request:
     branches:
       - main
