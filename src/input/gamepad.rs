@@ -50,7 +50,7 @@ pub enum GamepadEvent {
 pub struct GamepadInput {
     gilrs: Gilrs,
     axis_states: HashMap<GamepadId, AxisState>,
-    next_repeat: HashMap<(GamepadId, GamepadAction), Instant>,
+    repeater: RepeatScheduler,
 }
 
 impl GamepadInput {
@@ -61,7 +61,7 @@ impl GamepadInput {
         Ok(Self {
             gilrs,
             axis_states: HashMap::new(),
-            next_repeat: HashMap::new(),
+            repeater: RepeatScheduler::default(),
         })
     }
 
@@ -95,7 +95,7 @@ impl GamepadInput {
                 }
                 EventType::Disconnected => {
                     self.axis_states.remove(&id);
-                    self.next_repeat.retain(|(gamepad_id, _), _| *gamepad_id != id);
+                    self.repeater.release_gamepad(numeric_id);
                     translated.push(GamepadEvent::Disconnected { id: numeric_id });
                 }
                 EventType::ButtonPressed(button, _) => {
@@ -105,13 +105,13 @@ impl GamepadInput {
                             action,
                         });
                         if is_repeatable_direction(action) {
-                            self.start_repeat(id, action);
+                            self.repeater.press(numeric_id, action, Instant::now());
                         }
                     }
                 }
                 EventType::ButtonReleased(button, _) => {
                     if let Some(action) = button_action(button).filter(|a| is_repeatable_direction(*a)) {
-                        self.stop_repeat(id, action);
+                        self.repeater.release(numeric_id, action);
                     }
                 }
                 EventType::AxisChanged(axis, value, _) => {
@@ -119,7 +119,7 @@ impl GamepadInput {
                     for (action, pressed) in transitions {
                         if pressed {
                             translated.push(GamepadEvent::Action { id: numeric_id, action });
-                            self.start_repeat(id, action);
+                            self.repeater.press(numeric_id, action, Instant::now());
                         } else {
                             self.stop_repeat(id, action);
                         }
@@ -129,29 +129,45 @@ impl GamepadInput {
             }
         }
 
-        let now = Instant::now();
-        for (&(id, action), next_at) in &mut self.next_repeat {
-            if now >= *next_at {
-                translated.push(GamepadEvent::Action {
-                    id: usize::from(id),
-                    action,
-                });
-                *next_at = now + REPEAT_INTERVAL;
-            }
-        }
+        translated.extend(
+            self.repeater
+                .due(Instant::now())
+                .into_iter()
+                .map(|(id, action)| GamepadEvent::Action { id, action }),
+        );
 
         translated
     }
+}
 
-    fn start_repeat(&mut self, id: GamepadId, action: GamepadAction) {
-        let key = (id, action);
-        let now = Instant::now();
-        self.next_repeat.insert(key, now + REPEAT_DELAY);
+#[derive(Debug, Default)]
+struct RepeatScheduler {
+    next_repeat: HashMap<(usize, GamepadAction), Instant>,
+}
+
+impl RepeatScheduler {
+    fn press(&mut self, id: usize, action: GamepadAction, now: Instant) {
+        self.next_repeat
+            .insert((id, action), now + REPEAT_DELAY);
     }
 
-    fn stop_repeat(&mut self, id: GamepadId, action: GamepadAction) {
-        let key = (id, action);
-        self.next_repeat.remove(&key);
+    fn release(&mut self, id: usize, action: GamepadAction) {
+        self.next_repeat.remove(&(id, action));
+    }
+
+    fn release_gamepad(&mut self, id: usize) {
+        self.next_repeat.retain(|(gamepad_id, _), _| *gamepad_id != id);
+    }
+
+    fn due(&mut self, now: Instant) -> Vec<(usize, GamepadAction)> {
+        let mut actions = Vec::new();
+        for (&key, next_at) in &mut self.next_repeat {
+            if now >= *next_at {
+                actions.push(key);
+                *next_at = now + REPEAT_INTERVAL;
+            }
+        }
+        actions
     }
 }
 
@@ -321,6 +337,47 @@ mod tests {
         assert!(!is_repeatable_direction(GamepadAction::Back));
         assert_eq!(REPEAT_DELAY, Duration::from_millis(400));
         assert_eq!(REPEAT_INTERVAL, Duration::from_millis(120));
+    }
+
+    #[test]
+    fn held_direction_repeats_after_delay_then_at_interval_until_released() {
+        use super::RepeatScheduler;
+        use std::time::{Duration, Instant};
+
+        let start = Instant::now();
+        let mut repeater = RepeatScheduler::default();
+        repeater.press(0, GamepadAction::NavigateUp, start);
+
+        assert!(repeater.due(start + Duration::from_millis(399)).is_empty());
+        assert_eq!(
+            repeater.due(start + Duration::from_millis(400)),
+            vec![(0, GamepadAction::NavigateUp)]
+        );
+        assert!(repeater.due(start + Duration::from_millis(519)).is_empty());
+        assert_eq!(
+            repeater.due(start + Duration::from_millis(520)),
+            vec![(0, GamepadAction::NavigateUp)]
+        );
+
+        repeater.release(0, GamepadAction::NavigateUp);
+        assert!(repeater.due(start + Duration::from_secs(5)).is_empty());
+    }
+
+    #[test]
+    fn disconnect_clears_all_repeat_states_for_that_controller() {
+        use super::RepeatScheduler;
+        use std::time::{Duration, Instant};
+
+        let start = Instant::now();
+        let mut repeater = RepeatScheduler::default();
+        repeater.press(0, GamepadAction::NavigateUp, start);
+        repeater.press(1, GamepadAction::NavigateDown, start);
+        repeater.release_gamepad(0);
+
+        assert_eq!(
+            repeater.due(start + Duration::from_millis(400)),
+            vec![(1, GamepadAction::NavigateDown)]
+        );
     }
 
     #[test]
