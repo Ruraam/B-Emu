@@ -117,11 +117,7 @@ impl GamepadInput {
                     }
                 }
                 EventType::AxisChanged(axis, value, _) => {
-                    let transitions = self
-                        .axis_states
-                        .entry(id)
-                        .or_default()
-                        .update(axis, value);
+                    let transitions = self.axis_states.entry(id).or_default().update(axis, value);
                     for (action, pressed) in transitions {
                         if pressed {
                             translated.push(GamepadEvent::Action {
