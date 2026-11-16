@@ -110,7 +110,9 @@ impl GamepadInput {
                     }
                 }
                 EventType::ButtonReleased(button, _) => {
-                    if let Some(action) = button_action(button).filter(|a| is_repeatable_direction(*a)) {
+                    if let Some(action) =
+                        button_action(button).filter(|a| is_repeatable_direction(*a))
+                    {
                         self.repeater.release(numeric_id, action);
                     }
                 }
@@ -118,7 +120,10 @@ impl GamepadInput {
                     let transitions = self.axis_states.entry(id).or_default().update(axis, value);
                     for (action, pressed) in transitions {
                         if pressed {
-                            translated.push(GamepadEvent::Action { id: numeric_id, action });
+                            translated.push(GamepadEvent::Action {
+                                id: numeric_id,
+                                action,
+                            });
                             self.repeater.press(numeric_id, action, Instant::now());
                         } else {
                             self.repeater.release(numeric_id, action);
@@ -147,8 +152,7 @@ struct RepeatScheduler {
 
 impl RepeatScheduler {
     fn press(&mut self, id: usize, action: GamepadAction, now: Instant) {
-        self.next_repeat
-            .insert((id, action), now + REPEAT_DELAY);
+        self.next_repeat.insert((id, action), now + REPEAT_DELAY);
     }
 
     fn release(&mut self, id: usize, action: GamepadAction) {
@@ -156,7 +160,8 @@ impl RepeatScheduler {
     }
 
     fn release_gamepad(&mut self, id: usize) {
-        self.next_repeat.retain(|(gamepad_id, _), _| *gamepad_id != id);
+        self.next_repeat
+            .retain(|(gamepad_id, _), _| *gamepad_id != id);
     }
 
     fn due(&mut self, now: Instant) -> Vec<(usize, GamepadAction)> {
@@ -297,9 +302,13 @@ impl AxisState {
 
 #[cfg(test)]
 mod tests {
-    use super::{AxisDirection, AxisGate, AxisState, button_action};
+    use super::{
+        AxisDirection, AxisGate, AxisState, REPEAT_DELAY, REPEAT_INTERVAL, button_action,
+        is_repeatable_direction,
+    };
     use crate::input::GamepadAction;
     use gilrs::{Axis, Button};
+    use std::time::Duration;
 
     #[test]
     fn xbox_style_face_buttons_map_to_confirm_and_back() {

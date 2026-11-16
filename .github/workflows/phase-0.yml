@@ -9,6 +9,7 @@ on:
       - phase-1-navigation
       - phase-1-gamepad-input
       - phase-1-gamepad-ui
+      - phase-2-library-foundation
   pull_request:
     branches:
       - main
@@ -17,6 +18,7 @@ on:
       - phase-1-navigation
       - phase-1-gamepad-input
       - phase-1-gamepad-ui
+      - phase-2-library-foundation
 
 permissions:
   contents: read
