@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use b_emu::input::{GamepadAction, GamepadEvent, GamepadInput, navigation::apply_sidebar_action};
+use b_emu::input::{GamepadEvent, GamepadInput, navigation::apply_sidebar_action};
 
 use crate::MainWindow;
 
