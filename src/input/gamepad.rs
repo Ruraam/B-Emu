@@ -302,9 +302,13 @@ impl AxisState {
 
 #[cfg(test)]
 mod tests {
-    use super::{AxisDirection, AxisGate, AxisState, button_action};
+    use super::{
+        AxisDirection, AxisGate, AxisState, REPEAT_DELAY, REPEAT_INTERVAL, button_action,
+        is_repeatable_direction,
+    };
     use crate::input::GamepadAction;
     use gilrs::{Axis, Button};
+    use std::time::Duration;
 
     #[test]
     fn xbox_style_face_buttons_map_to_confirm_and_back() {
