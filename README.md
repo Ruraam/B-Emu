@@ -20,7 +20,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the architecture and [docs/
 
 ## Status
 
-Phase 0 prototype is in progress on the `phase-0-wayland-prototype` branch. CI is being used to validate the Wayland-only dependency graph and Linux build before the full interface is developed.
+The Wayland-only prototype, application shell, keyboard/mouse navigation, and native gamepad integration are implemented on the phase branches. Phase 2 library groundwork is now being developed on `phase-2-library-foundation`: a safe, read-only filesystem scanner comes before persistence, system identification, and UI integration.
 
 
 Deployment requirements and the planned rootless ULPM `.lpk` distribution model are documented in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
