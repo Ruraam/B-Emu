@@ -2,9 +2,10 @@
 
 ## Scope of this increment
 
-This first Phase 2 increment establishes a read-only filesystem discovery
-layer. It does not yet add a database, UI workflow, system identification,
-metadata providers, artwork downloads, or emulator launching.
+This Phase 2 foundation establishes a read-only filesystem discovery layer
+and a versioned SQLite persistence layer. It does not yet add a UI workflow,
+system identification, metadata providers, artwork downloads, or emulator
+launching.
 
 The scanner:
 
@@ -28,20 +29,22 @@ GameFile contains filesystem facts only: path, file name, extension, size,
 and optional modification time. It does not claim that a file is a valid ROM
 or identify a console/system.
 
-The scanner is independent from Slint and SQLite. Higher-level library
-services will own persistence and UI orchestration once their interfaces are
-defined and tested.
+The scanner is independent from Slint and SQLite. The SQLite store is a
+separate library-layer module: it owns versioned schema migrations, root
+records, and transactional snapshots without exposing database connections
+to the UI.
 
 ## Validation
 
-Unit tests cover recursive discovery, deterministic ordering, extension
+Scanner tests cover recursive discovery, deterministic ordering, extension
 filtering, non-recursive scans, pre-cancelled scans, invalid roots, and
-symbolic-link exclusion. CI compilation and tests remain required before
-this increment is considered complete.
+symbolic-link exclusion. Store tests cover schema creation/version checks,
+root uniqueness, snapshot replacement, incomplete-scan preservation, path
+containment, and cascading root removal. CI compilation and tests remain
+required before this increment is considered complete.
 
 ## Next increments
 
-1. Define stable library identity and a versioned SQLite schema.
-2. Add a cancellable background scan coordinator and progress reporting.
-3. Add an explicit system registry with tested extension-to-system mappings.
-4. Connect the library view to persisted scan results.
+1. Add a cancellable background scan coordinator and progress reporting.
+2. Add an explicit system registry with tested extension-to-system mappings.
+3. Connect the library view to persisted scan results.
