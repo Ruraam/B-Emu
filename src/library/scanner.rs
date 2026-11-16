@@ -85,7 +85,11 @@ impl fmt::Display for ScanError {
                 path.display()
             ),
             Self::RootNotDirectory(path) => {
-                write!(formatter, "library root is not a directory: {}", path.display())
+                write!(
+                    formatter,
+                    "library root is not a directory: {}",
+                    path.display()
+                )
             }
         }
     }
