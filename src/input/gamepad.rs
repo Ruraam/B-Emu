@@ -121,7 +121,7 @@ impl GamepadInput {
                             translated.push(GamepadEvent::Action { id: numeric_id, action });
                             self.repeater.press(numeric_id, action, Instant::now());
                         } else {
-                            self.stop_repeat(id, action);
+                            self.repeater.release(numeric_id, action);
                         }
                     }
                 }
