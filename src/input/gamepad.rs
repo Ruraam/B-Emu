@@ -1,6 +1,9 @@
 //! Linux gamepad discovery and event normalization through GilRs.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 
 use gilrs::{Axis, Button, EventType, GamepadId, Gilrs};
 
@@ -47,6 +50,8 @@ pub enum GamepadEvent {
 pub struct GamepadInput {
     gilrs: Gilrs,
     axis_states: HashMap<GamepadId, AxisState>,
+    held_directions: HashMap<(GamepadId, GamepadAction), Instant>,
+    next_repeat: HashMap<(GamepadId, GamepadAction), Instant>,
 }
 
 impl GamepadInput {
@@ -57,6 +62,8 @@ impl GamepadInput {
         Ok(Self {
             gilrs,
             axis_states: HashMap::new(),
+            held_directions: HashMap::new(),
+            next_repeat: HashMap::new(),
         })
     }
 
@@ -90,6 +97,8 @@ impl GamepadInput {
                 }
                 EventType::Disconnected => {
                     self.axis_states.remove(&id);
+                    self.held_directions.retain(|(gamepad_id, _), _| *gamepad_id != id);
+                    self.next_repeat.retain(|(gamepad_id, _), _| *gamepad_id != id);
                     translated.push(GamepadEvent::Disconnected { id: numeric_id });
                 }
                 EventType::ButtonPressed(button, _) => {
@@ -98,24 +107,70 @@ impl GamepadInput {
                             id: numeric_id,
                             action,
                         });
+                        if is_repeatable_direction(action) {
+                            self.start_repeat(id, action);
+                        }
+                    }
+                }
+                EventType::ButtonReleased(button, _) => {
+                    if let Some(action) = button_action(button).filter(|a| is_repeatable_direction(*a)) {
+                        self.stop_repeat(id, action);
                     }
                 }
                 EventType::AxisChanged(axis, value, _) => {
-                    if let Some(action) =
-                        self.axis_states.entry(id).or_default().update(axis, value)
-                    {
-                        translated.push(GamepadEvent::Action {
-                            id: numeric_id,
-                            action,
-                        });
+                    let transitions = self.axis_states.entry(id).or_default().update(axis, value);
+                    for (action, pressed) in transitions {
+                        if pressed {
+                            translated.push(GamepadEvent::Action { id: numeric_id, action });
+                            self.start_repeat(id, action);
+                        } else {
+                            self.stop_repeat(id, action);
+                        }
                     }
                 }
                 _ => {}
             }
         }
 
+        let now = Instant::now();
+        for (&(id, action), next_at) in &mut self.next_repeat {
+            if now >= *next_at {
+                translated.push(GamepadEvent::Action {
+                    id: usize::from(id),
+                    action,
+                });
+                *next_at = now + REPEAT_INTERVAL;
+            }
+        }
+
         translated
     }
+
+    fn start_repeat(&mut self, id: GamepadId, action: GamepadAction) {
+        let key = (id, action);
+        let now = Instant::now();
+        self.held_directions.insert(key, now);
+        self.next_repeat.insert(key, now + REPEAT_DELAY);
+    }
+
+    fn stop_repeat(&mut self, id: GamepadId, action: GamepadAction) {
+        let key = (id, action);
+        self.held_directions.remove(&key);
+        self.next_repeat.remove(&key);
+    }
+}
+
+const REPEAT_DELAY: Duration = Duration::from_millis(400);
+const REPEAT_INTERVAL: Duration = Duration::from_millis(120);
+
+fn is_repeatable_direction(action: GamepadAction) -> bool {
+    matches!(
+        action,
+        GamepadAction::NavigateUp
+            | GamepadAction::NavigateDown
+            | GamepadAction::NavigateLeft
+            | GamepadAction::NavigateRight
+    )
 }
 
 fn button_action(button: Button) -> Option<GamepadAction> {
@@ -179,7 +234,7 @@ struct AxisState {
 }
 
 impl AxisState {
-    fn update(&mut self, axis: Axis, value: f32) -> Option<GamepadAction> {
+    fn update(&mut self, axis: Axis, value: f32) -> Vec<(GamepadAction, bool)> {
         let (gate, negative, positive) = match axis {
             Axis::LeftStickX => (
                 &mut self.left_x,
@@ -203,14 +258,29 @@ impl AxisState {
                 GamepadAction::NavigateDown,
                 GamepadAction::NavigateUp,
             ),
-            _ => return None,
+            _ => return Vec::new(),
         };
 
-        match gate.update(value)? {
+        let previous = gate.direction;
+        gate.update(value);
+        let current = gate.direction;
+        if previous == current {
+            return Vec::new();
+        }
+
+        let action_for = |direction| match direction {
             AxisDirection::Negative => Some(negative),
             AxisDirection::Positive => Some(positive),
             AxisDirection::Neutral => None,
+        };
+        let mut transitions = Vec::with_capacity(2);
+        if let Some(action) = action_for(previous) {
+            transitions.push((action, false));
         }
+        if let Some(action) = action_for(current) {
+            transitions.push((action, true));
+        }
+        transitions
     }
 }
 
@@ -247,6 +317,18 @@ mod tests {
     }
 
     #[test]
+    fn only_navigation_directions_repeat() {
+        assert!(is_repeatable_direction(GamepadAction::NavigateUp));
+        assert!(is_repeatable_direction(GamepadAction::NavigateDown));
+        assert!(is_repeatable_direction(GamepadAction::NavigateLeft));
+        assert!(is_repeatable_direction(GamepadAction::NavigateRight));
+        assert!(!is_repeatable_direction(GamepadAction::Confirm));
+        assert!(!is_repeatable_direction(GamepadAction::Back));
+        assert_eq!(REPEAT_DELAY, Duration::from_millis(400));
+        assert_eq!(REPEAT_INTERVAL, Duration::from_millis(120));
+    }
+
+    #[test]
     fn unrelated_buttons_are_ignored() {
         assert_eq!(button_action(Button::North), None);
         assert_eq!(button_action(Button::West), None);
@@ -280,11 +362,11 @@ mod tests {
 
         assert_eq!(
             state.update(Axis::LeftStickY, 0.8),
-            Some(GamepadAction::NavigateUp)
+            vec![(GamepadAction::NavigateUp, true)]
         );
         assert_eq!(
             state.update(Axis::LeftStickX, 0.8),
-            Some(GamepadAction::NavigateRight)
+            vec![(GamepadAction::NavigateRight, true)]
         );
     }
 
@@ -294,11 +376,11 @@ mod tests {
 
         assert_eq!(
             state.update(Axis::DPadY, -0.8),
-            Some(GamepadAction::NavigateDown)
+            vec![(GamepadAction::NavigateDown, true)]
         );
         assert_eq!(
             state.update(Axis::DPadX, -0.8),
-            Some(GamepadAction::NavigateLeft)
+            vec![(GamepadAction::NavigateLeft, true)]
         );
     }
 
@@ -308,8 +390,11 @@ mod tests {
 
         assert_eq!(
             state.update(Axis::LeftStickY, 0.8),
-            Some(GamepadAction::NavigateUp)
+            vec![(GamepadAction::NavigateUp, true)]
         );
-        assert_eq!(state.update(Axis::LeftStickY, 0.1), None);
+        assert_eq!(
+            state.update(Axis::LeftStickY, 0.1),
+            vec![(GamepadAction::NavigateUp, false)]
+        );
     }
 }
