@@ -1,8 +1,7 @@
 use std::{
     collections::HashSet,
     error::Error,
-    fmt,
-    fs,
+    fmt, fs,
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, Ordering},
     time::UNIX_EPOCH,
@@ -20,7 +19,11 @@ pub struct ScanOptions {
 
 impl ScanOptions {
     pub fn recursive() -> Self {
-        Self { recursive: true, max_depth: None, extensions: HashSet::new() }
+        Self {
+            recursive: true,
+            max_depth: None,
+            extensions: HashSet::new(),
+        }
     }
 
     pub fn with_extensions<I, S>(mut self, extensions: I) -> Self
@@ -30,15 +33,20 @@ impl ScanOptions {
     {
         self.extensions = extensions
             .into_iter()
-            .map(|extension| extension.as_ref().trim().trim_start_matches('.').to_ascii_lowercase())
+            .map(|extension| {
+                extension
+                    .as_ref()
+                    .trim()
+                    .trim_start_matches('.')
+                    .to_ascii_lowercase()
+            })
             .filter(|extension| !extension.is_empty())
             .collect();
         self
     }
 
     fn accepts_extension(&self, extension: Option<&str>) -> bool {
-        self.extensions.is_empty()
-            || extension.is_some_and(|value| self.extensions.contains(value))
+        self.extensions.is_empty() || extension.is_some_and(|value| self.extensions.contains(value))
     }
 }
 
@@ -57,7 +65,10 @@ pub struct ScanReport {
 
 #[derive(Debug)]
 pub enum ScanError {
-    Io { path: PathBuf, source: std::io::Error },
+    Io {
+        path: PathBuf,
+        source: std::io::Error,
+    },
     RootIsSymlink(PathBuf),
     RootNotDirectory(PathBuf),
 }
@@ -65,9 +76,17 @@ pub enum ScanError {
 impl fmt::Display for ScanError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Io { path, source } => write!(formatter, "cannot inspect {}: {source}", path.display()),
-            Self::RootIsSymlink(path) => write!(formatter, "library root must not be a symbolic link: {}", path.display()),
-            Self::RootNotDirectory(path) => write!(formatter, "library root is not a directory: {}", path.display()),
+            Self::Io { path, source } => {
+                write!(formatter, "cannot inspect {}: {source}", path.display())
+            }
+            Self::RootIsSymlink(path) => write!(
+                formatter,
+                "library root must not be a symbolic link: {}",
+                path.display()
+            ),
+            Self::RootNotDirectory(path) => {
+                write!(formatter, "library root is not a directory: {}", path.display())
+            }
         }
     }
 }
@@ -104,7 +123,9 @@ pub fn scan_directory(
 
     let mut report = ScanReport::default();
     visit_directory(root, 0, options, cancel, &mut report);
-    report.files.sort_by(|left, right| left.path.cmp(&right.path));
+    report
+        .files
+        .sort_by(|left, right| left.path.cmp(&right.path));
     report.cancelled = cancel.load(Ordering::Acquire);
     Ok(report)
 }
@@ -123,7 +144,10 @@ fn visit_directory(
     let entries = match fs::read_dir(directory) {
         Ok(entries) => entries,
         Err(error) => {
-            report.issues.push(ScanIssue { path: directory.to_path_buf(), message: error.to_string() });
+            report.issues.push(ScanIssue {
+                path: directory.to_path_buf(),
+                message: error.to_string(),
+            });
             return;
         }
     };
@@ -136,7 +160,10 @@ fn visit_directory(
         let entry = match entry {
             Ok(entry) => entry,
             Err(error) => {
-                report.issues.push(ScanIssue { path: directory.to_path_buf(), message: error.to_string() });
+                report.issues.push(ScanIssue {
+                    path: directory.to_path_buf(),
+                    message: error.to_string(),
+                });
                 continue;
             }
         };
@@ -144,7 +171,10 @@ fn visit_directory(
         let metadata = match fs::symlink_metadata(&path) {
             Ok(metadata) => metadata,
             Err(error) => {
-                report.issues.push(ScanIssue { path, message: error.to_string() });
+                report.issues.push(ScanIssue {
+                    path,
+                    message: error.to_string(),
+                });
                 continue;
             }
         };
@@ -166,17 +196,21 @@ fn visit_directory(
             continue;
         }
 
-        let extension = path.extension()
+        let extension = path
+            .extension()
             .and_then(|value| value.to_str())
             .map(str::to_ascii_lowercase);
         if !options.accepts_extension(extension.as_deref()) {
             continue;
         }
 
-        let file_name = path.file_name()
+        let file_name = path
+            .file_name()
             .map(|value| value.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let modified_unix_secs = metadata.modified().ok()
+        let modified_unix_secs = metadata
+            .modified()
+            .ok()
             .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
             .map(|duration| duration.as_secs());
 
@@ -206,18 +240,26 @@ mod tests {
 
     impl TempDir {
         fn new() -> Self {
-            let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+            let nonce = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
             let id = NEXT_TEMP_ID.fetch_add(1, Ordering::Relaxed);
-            let path = std::env::temp_dir().join(format!("b-emu-library-{}-{nonce}-{id}", std::process::id()));
+            let path = std::env::temp_dir()
+                .join(format!("b-emu-library-{}-{nonce}-{id}", std::process::id()));
             fs::create_dir_all(&path).unwrap();
             Self(path)
         }
 
-        fn path(&self) -> &Path { &self.0 }
+        fn path(&self) -> &Path {
+            &self.0
+        }
     }
 
     impl Drop for TempDir {
-        fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); }
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
     }
 
     fn write_file(path: &Path, contents: &[u8]) {
@@ -232,7 +274,12 @@ mod tests {
         write_file(&temp.path().join("z.rom"), b"123");
         write_file(&temp.path().join("nested").join("a.iso"), b"12345");
 
-        let report = scan_directory(temp.path(), &ScanOptions::recursive(), &AtomicBool::new(false)).unwrap();
+        let report = scan_directory(
+            temp.path(),
+            &ScanOptions::recursive(),
+            &AtomicBool::new(false),
+        )
+        .unwrap();
 
         assert_eq!(report.files.len(), 2);
         assert!(report.files[0].path.ends_with("a.iso"));
@@ -259,7 +306,10 @@ mod tests {
         fs::create_dir(temp.path().join("nested")).unwrap();
         write_file(&temp.path().join("root.rom"), b"root");
         write_file(&temp.path().join("nested").join("child.rom"), b"child");
-        let options = ScanOptions { recursive: false, ..ScanOptions::default() };
+        let options = ScanOptions {
+            recursive: false,
+            ..ScanOptions::default()
+        };
         let report = scan_directory(temp.path(), &options, &AtomicBool::new(false)).unwrap();
         assert_eq!(report.files.len(), 1);
         assert_eq!(report.files[0].file_name, "root.rom");
@@ -280,7 +330,8 @@ mod tests {
         let temp = TempDir::new();
         let file = temp.path().join("not-a-directory");
         write_file(&file, b"x");
-        let error = scan_directory(&file, &ScanOptions::recursive(), &AtomicBool::new(false)).unwrap_err();
+        let error =
+            scan_directory(&file, &ScanOptions::recursive(), &AtomicBool::new(false)).unwrap_err();
         assert!(matches!(error, ScanError::RootNotDirectory(_)));
     }
 
@@ -288,11 +339,17 @@ mod tests {
     #[test]
     fn does_not_follow_symbolic_links() {
         use std::os::unix::fs::symlink;
+
         let temp = TempDir::new();
         let outside = TempDir::new();
         write_file(&outside.path().join("outside.rom"), b"outside");
         symlink(outside.path(), temp.path().join("linked-directory")).unwrap();
-        let report = scan_directory(temp.path(), &ScanOptions::recursive(), &AtomicBool::new(false)).unwrap();
+        let report = scan_directory(
+            temp.path(),
+            &ScanOptions::recursive(),
+            &AtomicBool::new(false),
+        )
+        .unwrap();
         assert!(report.files.is_empty());
     }
 }
