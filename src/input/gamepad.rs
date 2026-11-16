@@ -50,7 +50,6 @@ pub enum GamepadEvent {
 pub struct GamepadInput {
     gilrs: Gilrs,
     axis_states: HashMap<GamepadId, AxisState>,
-    held_directions: HashMap<(GamepadId, GamepadAction), Instant>,
     next_repeat: HashMap<(GamepadId, GamepadAction), Instant>,
 }
 
@@ -62,7 +61,6 @@ impl GamepadInput {
         Ok(Self {
             gilrs,
             axis_states: HashMap::new(),
-            held_directions: HashMap::new(),
             next_repeat: HashMap::new(),
         })
     }
@@ -97,7 +95,6 @@ impl GamepadInput {
                 }
                 EventType::Disconnected => {
                     self.axis_states.remove(&id);
-                    self.held_directions.retain(|(gamepad_id, _), _| *gamepad_id != id);
                     self.next_repeat.retain(|(gamepad_id, _), _| *gamepad_id != id);
                     translated.push(GamepadEvent::Disconnected { id: numeric_id });
                 }
@@ -149,13 +146,11 @@ impl GamepadInput {
     fn start_repeat(&mut self, id: GamepadId, action: GamepadAction) {
         let key = (id, action);
         let now = Instant::now();
-        self.held_directions.insert(key, now);
         self.next_repeat.insert(key, now + REPEAT_DELAY);
     }
 
     fn stop_repeat(&mut self, id: GamepadId, action: GamepadAction) {
         let key = (id, action);
-        self.held_directions.remove(&key);
         self.next_repeat.remove(&key);
     }
 }
