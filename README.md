@@ -20,7 +20,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the architecture and [docs/
 
 ## Status
 
-The Wayland-only prototype, application shell, keyboard/mouse navigation, and native gamepad integration are implemented on the phase branches. Phase 2 library groundwork is now being developed on `phase-2-library-foundation`: a safe, read-only filesystem scanner comes before persistence, system identification, and UI integration.
+The Wayland-only prototype, application shell, keyboard/mouse navigation, and native gamepad integration are implemented on the phase branches. Phase 2 library groundwork is now being developed on `phase-2-library-foundation`: a safe, read-only filesystem scanner and a versioned, user-scoped SQLite store are in place. System identification, background scan coordination, and UI integration remain future increments.
 
 
 Deployment requirements and the planned rootless ULPM `.lpk` distribution model are documented in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
