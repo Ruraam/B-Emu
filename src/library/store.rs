@@ -387,8 +387,8 @@ mod tests {
     fn rejects_a_newer_schema_version() {
         let connection = Connection::open_in_memory().unwrap();
         connection.pragma_update(None, "user_version", SCHEMA_VERSION + 1).unwrap();
-        let error = LibraryStore::from_connection(connection).unwrap_err();
-        assert!(matches!(error, StoreError::UnsupportedSchemaVersion(2)));
+        let result = LibraryStore::from_connection(connection);
+        assert!(matches!(result, Err(StoreError::UnsupportedSchemaVersion(2))));
     }
 
     #[test]
