@@ -28,8 +28,10 @@ events into the normalized actions in `input::GamepadAction`.
 | East face button (B on common Xbox layouts) | Back to Home |
 
 Analog directions use a 0.65 activation threshold and 0.35 return threshold
-to reduce jitter. Direction changes are emitted once per threshold transition,
-not continuously while an axis is held.
+to reduce jitter. The D-pad and left stick trigger navigation immediately,
+then repeat after 400 ms and every 120 ms while held. Releasing the control or
+disconnecting its controller cancels repetition. Confirm (A) and Back (B)
+remain single-shot actions and are never repeated.
 
 The current application shell has a vertical sidebar. Therefore left/right
 actions are normalized now but intentionally do not alter the sidebar state;
