@@ -32,9 +32,13 @@ metadata with provenance, a sidecar artwork cache and BIOS/firmware validation.
 Phase 5 persists preferences, applies scans transactionally, validates launch
 paths before starting an emulator, and produces a signed rootless ULPM `.lpk`.
 
-To try the shell with a non-empty library, run `bash scripts/prepare-demo.sh`:
-it creates isolated XDG directories with a few dummy games and prints the
-environment variables and command to launch B-Emu.
+To try the shell interactively from the project files (no `.lpk` needed), run
+`bash scripts/try-interactive.sh`: it creates a small demo library, starts a
+nested Weston on the current X11 display, and launches the development binary
+inside it. `bash scripts/smoke-wayland.sh` is the headless equivalent. On a
+native Wayland session, `bash scripts/prepare-demo.sh` only prepares the demo
+XDG directories and prints the environment to export before running
+`./target/debug/b-emu`.
 
 Release artifacts are built with `bash scripts/release-lpk.sh` (signed `.lpk`
 plus a minimal signed repository); `bash scripts/smoke-wayland.sh` runs the
