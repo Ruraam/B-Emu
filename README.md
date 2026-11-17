@@ -20,16 +20,17 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the architecture and [docs/
 
 ## Status
 
-Phase 0 validated the Wayland-only build and startup policy. Phase 1 is in
-progress on the `phase-1-*` branches: the shell now has five data-driven screens
-(Home, Systems, Library, Emulators, Settings) with a unified keyboard, mouse and
-gamepad focus model. The screens are seeded from typed Rust view models in
-`src/shell.rs`; real library scanning and emulator detection arrive in Phases 2
-and 3.
+Phase 0 validated the Wayland-only build and startup policy. Phase 1 delivered
+five data-driven screens (Home, Systems, Library, Emulators, Settings) with a
+unified keyboard, mouse and gamepad focus model. Phase 2 adds configurable game
+directories, a read-only SHA-256 scanner and a local SQLite index that backs the
+Home, Systems and Library screens. Emulator detection remains planned for
+Phase 3.
 
 CI validates formatting, the Wayland-only dependency graph, the Linux build,
-unit tests, and a headless Weston startup smoke test. See [docs/GAMEPAD.md](docs/GAMEPAD.md)
-for the input model and [docs/PHASE-0.md](docs/PHASE-0.md) for the renderer and
-Wayland policy.
+unit tests, and a headless Weston startup smoke test. See
+[docs/PHASE-2.md](docs/PHASE-2.md) for the library design,
+[docs/GAMEPAD.md](docs/GAMEPAD.md) for the input model, and
+[docs/PHASE-0.md](docs/PHASE-0.md) for the renderer and Wayland policy.
 
 Deployment requirements and the planned rootless ULPM `.lpk` distribution model are documented in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).

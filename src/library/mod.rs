@@ -80,6 +80,10 @@ impl Library {
         Ok(self.db.search(query)?)
     }
 
+    pub fn recent(&self, limit: i32) -> Result<Vec<GameRecord>, LibraryError> {
+        Ok(self.db.recent(limit)?)
+    }
+
     pub fn counts(&self) -> Result<Counts, LibraryError> {
         Ok(self.db.counts()?)
     }

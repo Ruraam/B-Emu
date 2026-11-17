@@ -27,6 +27,23 @@ export struct SystemCard {
     accent: color,
 }
 
+// A game indexed from the user's own files (Phase 2).
+export struct IndexedGame {
+    title: string,
+    system: string,
+    path: string,
+    size: string,
+    accent: color,
+    duplicate: bool,
+}
+
+// Aggregated system information from the SQLite index.
+export struct SystemStat {
+    name: string,
+    game-count: int,
+    accent: color,
+}
+
 export struct EmulatorRow {
     name: string,
     version: string,

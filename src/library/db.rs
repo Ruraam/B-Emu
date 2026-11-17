@@ -140,6 +140,14 @@ impl LibraryDb {
         )
     }
 
+    pub fn recent(&self, limit: i32) -> Result<Vec<GameRecord>, rusqlite::Error> {
+        self.query_games(
+            "SELECT path, title, system, size, checksum, source_dir FROM games
+             ORDER BY modified_ns DESC, title LIMIT ?1",
+            [limit],
+        )
+    }
+
     pub fn search(&self, query: &str) -> Result<Vec<GameRecord>, rusqlite::Error> {
         let pattern = format!("%{}%", query.trim().to_lowercase());
         if pattern.trim_matches('%').is_empty() {

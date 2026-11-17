@@ -126,6 +126,14 @@ mod tests {
     }
 
     #[test]
+    fn malformed_file_is_reported() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        std::fs::write(&path, b"{ not json }").unwrap();
+        assert!(matches!(Config::load(&path), Err(ConfigError::Json(_))));
+    }
+
+    #[test]
     fn removes_a_directory() {
         let mut config = Config::default();
         config.add_dir(PathBuf::from("/roms")).unwrap();

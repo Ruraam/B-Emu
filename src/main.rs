@@ -1,13 +1,24 @@
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
+
 use b_emu::{
+    config::Config,
     input::{
         GamepadAction,
         navigation::{FocusZone, Navigation, apply_action},
     },
+    library::Library,
+    paths::AppPaths,
     wayland,
 };
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 mod gamepad_worker;
+mod scan_worker;
 mod shell;
 
 slint::include_modules!();
@@ -54,7 +65,7 @@ fn item_count(window: &MainWindow) -> i32 {
         1 => window.get_systems().row_count() as i32,
         2 => window.get_library_games().row_count() as i32,
         3 => window.get_emulators().row_count() as i32,
-        4 => 3, // settings rows
+        4 => 5 + window.get_game_dirs().row_count() as i32, // 3 toggles + dirs + add + scan
         _ => 0,
     }
 }
@@ -116,30 +127,228 @@ fn apply_nav_action(window: &MainWindow, action: NavAction) {
         }
     }
 
-    // The settings screen toggles its focused row on Confirm.
     if gamepad_action == GamepadAction::Confirm
         && next.zone == FocusZone::Content
         && next.active_page == 4
     {
-        toggle_setting(window, next.focused_item);
+        activate_settings_item(window, next.focused_item);
     }
 }
 
-fn seed_models(window: &MainWindow) {
-    let games = shell::all_games();
-    let emulators = shell::emulators();
-
-    window.set_pages(model(shell::pages()));
-    window.set_last_played(model(shell::last_played()));
-    window.set_recent_games(model(shell::recent_games()));
-    window.set_library_games(model(games.clone()));
-    window.set_systems(model(shell::systems()));
-    window.set_emulators(model(emulators.clone()));
-    window.set_games_count(games.len() as i32);
-    window.set_emulators_ready_count(emulators.iter().filter(|row| row.ready).count() as i32);
+fn game_size(bytes: i64) -> SharedString {
+    if bytes >= 1024 * 1024 {
+        format!("{} Mo", bytes / (1024 * 1024)).into()
+    } else if bytes >= 1024 {
+        format!("{} Ko", bytes / 1024).into()
+    } else {
+        format!("{} o", bytes).into()
+    }
 }
 
-fn wire_callbacks(window: &MainWindow) {
+fn to_indexed_games(
+    records: Vec<b_emu::library::GameRecord>,
+    duplicates: &HashMap<String, usize>,
+) -> Vec<IndexedGame> {
+    records
+        .into_iter()
+        .map(|game| IndexedGame {
+            title: SharedString::from(game.title),
+            system: SharedString::from(game.system.clone()),
+            path: SharedString::from(game.path.to_string_lossy().as_ref()),
+            size: game_size(game.size),
+            accent: shell::system_accent(&game.system),
+            duplicate: duplicates.get(&game.checksum).copied().unwrap_or(0) > 1,
+        })
+        .collect()
+}
+
+/// Reloads every library-backed model from the SQLite index.
+fn refresh_library(window: &MainWindow, db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let library = Library::open(db_path)?;
+    let all = library.games()?;
+    let counts = library.counts()?;
+
+    let mut duplicates: HashMap<String, usize> = HashMap::new();
+    for game in &all {
+        *duplicates.entry(game.checksum.clone()).or_insert(0) += 1;
+    }
+
+    let recent: Vec<_> = library.recent(4)?;
+    let mut last_played = recent.clone();
+    last_played.truncate(1);
+
+    window.set_library_games(model(to_indexed_games(all, &duplicates)));
+    window.set_recent_games(model(to_indexed_games(recent, &duplicates)));
+    window.set_last_played(model(to_indexed_games(last_played, &duplicates)));
+
+    let systems: Vec<SystemStat> = library
+        .systems()?
+        .into_iter()
+        .map(|system| SystemStat {
+            name: SharedString::from(system.name.clone()),
+            game_count: system.game_count,
+            accent: shell::system_accent(&system.name),
+        })
+        .collect();
+    window.set_systems(model(systems));
+
+    window.set_games_count(counts.games);
+    window.set_systems_count(counts.systems);
+    window.set_duplicates_count(counts.duplicates);
+    Ok(())
+}
+
+fn refresh_dirs(window: &MainWindow, config_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let config = Config::load(config_path)?;
+    let dirs: Vec<SharedString> = config
+        .game_dirs
+        .iter()
+        .map(|path| SharedString::from(path.to_string_lossy().as_ref()))
+        .collect();
+    window.set_game_dirs(model(dirs));
+    Ok(())
+}
+
+fn add_dir(window: &MainWindow, config_path: &Path, text: SharedString) {
+    let path = PathBuf::from(text.as_str());
+    if path.as_os_str().is_empty() {
+        window.set_scan_status("Chemin vide".into());
+        return;
+    }
+    if !path.is_absolute() {
+        window.set_scan_status("Chemin absolu requis".into());
+        return;
+    }
+    if !path.is_dir() {
+        window.set_scan_status("Dossier introuvable".into());
+        return;
+    }
+
+    let result = (|| -> Result<(), Box<dyn std::error::Error>> {
+        let mut config = Config::load(config_path)?;
+        let added = config.add_dir(path)?;
+        config.save(config_path)?;
+        refresh_dirs(window, config_path)?;
+        window.set_scan_status(if added {
+            "Dossier ajouté".into()
+        } else {
+            "Dossier déjà configuré".into()
+        });
+        Ok(())
+    })();
+
+    if let Err(error) = result {
+        eprintln!("[b-emu] could not add game directory: {error}");
+        window.set_scan_status("Erreur lors de l'ajout".into());
+    }
+}
+
+fn remove_dir(window: &MainWindow, config_path: &Path, index: i32) {
+    let result = (|| -> Result<(), Box<dyn std::error::Error>> {
+        let mut config = Config::load(config_path)?;
+        if index >= 0 && (index as usize) < config.game_dirs.len() {
+            config.game_dirs.remove(index as usize);
+            config.save(config_path)?;
+            refresh_dirs(window, config_path)?;
+            window.set_scan_status("Dossier retiré".into());
+        }
+        Ok(())
+    })();
+
+    if let Err(error) = result {
+        eprintln!("[b-emu] could not remove game directory: {error}");
+    }
+
+    let count = 5 + window.get_game_dirs().row_count() as i32;
+    if window.get_focused_item() >= count {
+        window.set_focused_item(count - 1);
+    }
+}
+
+fn start_scan(
+    window: &MainWindow,
+    config_path: &Path,
+    db_path: &Path,
+    slot: &Rc<RefCell<Option<scan_worker::ScanWorker>>>,
+) {
+    let config = match Config::load(config_path) {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("[b-emu] could not read configuration: {error}");
+            return;
+        }
+    };
+
+    if config.game_dirs.is_empty() {
+        window.set_scan_status("Ajoutez un dossier de jeux".into());
+        return;
+    }
+
+    let weak = window.as_weak();
+    let refresh_db = db_path.to_path_buf();
+    let on_finished = Box::new(move || {
+        let weak = weak.clone();
+        let refresh_db = refresh_db.clone();
+        let _ = weak.upgrade_in_event_loop(move |ui| {
+            if let Err(error) = refresh_library(&ui, &refresh_db) {
+                eprintln!("[b-emu] could not refresh library view: {error}");
+            }
+        });
+    });
+
+    let worker = scan_worker::ScanWorker::start(
+        window.as_weak(),
+        db_path.to_path_buf(),
+        config.game_dirs,
+        on_finished,
+    );
+    match worker {
+        Ok(worker) => {
+            *slot.borrow_mut() = Some(worker);
+            window.set_scan_status("Analyse…".into());
+        }
+        Err(error) => {
+            eprintln!("[b-emu] could not start scan worker: {error}");
+            window.set_scan_status("Échec du démarrage".into());
+        }
+    }
+}
+
+fn activate_settings_item(window: &MainWindow, index: i32) {
+    let dirs = window.get_game_dirs().row_count() as i32;
+    if index < 3 {
+        toggle_setting(window, index);
+    } else if index < 3 + dirs {
+        window.invoke_remove_focused_dir();
+    } else if index == 3 + dirs {
+        let text = window.get_new_dir_text();
+        window.invoke_add_dir(text);
+    } else if index == 4 + dirs {
+        window.invoke_scan_now();
+    }
+}
+
+fn run() -> Result<(), Box<dyn std::error::Error>> {
+    let paths = AppPaths::from_env()?;
+    let config_path = paths.config_dir.join("config.json");
+    let db_path = paths.data_dir.join("library.sqlite3");
+
+    let window = MainWindow::new()?;
+    window.set_pages(model(shell::pages()));
+    window.set_emulators(model(shell::emulators()));
+    window.set_emulators_ready_count(
+        shell::emulators().iter().filter(|row| row.ready).count() as i32,
+    );
+
+    if let Err(error) = refresh_dirs(&window, &config_path) {
+        eprintln!("[b-emu] could not load game directories: {error}");
+    }
+    if let Err(error) = refresh_library(&window, &db_path) {
+        eprintln!("[b-emu] could not load library index: {error}");
+    }
+
+    let scan_slot: Rc<RefCell<Option<scan_worker::ScanWorker>>> = Rc::new(RefCell::new(None));
+
     let weak = window.as_weak();
     window.on_request_action(move |action| {
         if let Some(window) = weak.upgrade() {
@@ -155,22 +364,60 @@ fn wire_callbacks(window: &MainWindow) {
     });
 
     let weak = window.as_weak();
-    let games = shell::all_games();
-    window.on_search_changed(move |text: SharedString| {
+    let config = config_path.clone();
+    window.on_add_dir(move |text| {
         if let Some(window) = weak.upgrade() {
-            let filtered = shell::filter_games(&games, &text);
-            window.set_search_text(text);
-            window.set_library_games(model(filtered));
-            window.set_focused_item(0);
-            window.set_selected_item(-1);
+            add_dir(&window, &config, text);
         }
     });
-}
 
-fn run() -> Result<(), slint::PlatformError> {
-    let window = MainWindow::new()?;
-    seed_models(&window);
-    wire_callbacks(&window);
+    let weak = window.as_weak();
+    let config = config_path.clone();
+    window.on_remove_dir(move |index| {
+        if let Some(window) = weak.upgrade() {
+            remove_dir(&window, &config, index);
+        }
+    });
+
+    let weak = window.as_weak();
+    let config = config_path.clone();
+    let db = db_path.clone();
+    let slot = Rc::clone(&scan_slot);
+    window.on_scan_now(move || {
+        if let Some(window) = weak.upgrade() {
+            start_scan(&window, &config, &db, &slot);
+        }
+    });
+
+    let weak = window.as_weak();
+    let db = db_path.clone();
+    window.on_search_changed(move |text: SharedString| {
+        if let Some(window) = weak.upgrade() {
+            match Library::open(&db).and_then(|library| library.search(&text)) {
+                Ok(records) => {
+                    let mut duplicates: HashMap<String, usize> = HashMap::new();
+                    if let Ok(all) = Library::open(&db).and_then(|library| library.games()) {
+                        for game in &all {
+                            *duplicates.entry(game.checksum.clone()).or_insert(0) += 1;
+                        }
+                    }
+                    window.set_search_text(text);
+                    window.set_library_games(model(to_indexed_games(records, &duplicates)));
+                    window.set_focused_item(0);
+                    window.set_selected_item(-1);
+                }
+                Err(error) => eprintln!("[b-emu] library search failed: {error}"),
+            }
+        }
+    });
+
+    if window.get_setting_auto_scan()
+        && Config::load(&config_path)
+            .map(|config| !config.game_dirs.is_empty())
+            .unwrap_or(false)
+    {
+        start_scan(&window, &config_path, &db_path, &scan_slot);
+    }
 
     let _gamepad_worker = match gamepad_worker::GamepadWorker::start(window.as_weak()) {
         Ok(worker) => Some(worker),
@@ -180,5 +427,6 @@ fn run() -> Result<(), slint::PlatformError> {
         }
     };
 
-    window.run()
+    window.run()?;
+    Ok(())
 }

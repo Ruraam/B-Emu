@@ -3,14 +3,14 @@ import { GlassPanel } from "../components/glass-panel.slint";
 import { PageHeader } from "../components/page-header.slint";
 import { ListRow } from "../components/list-row.slint";
 import { StatusPill } from "../components/status-pill.slint";
-import { GameCard } from "../models.slint";
+import { IndexedGame } from "../models.slint";
 
 export component LibraryScreen inherits VerticalLayout {
-    in property<[GameCard]> games;
+    in property<[IndexedGame]> games;
     in property<int> focused-item: 0;
     in property<bool> content-focused: false;
     in property<int> selected-item: -1;
-    in property<string> search-text: "";
+    in-out property<string> search-text: "";
     callback search-changed(string);
 
     spacing: 16px;
@@ -18,7 +18,7 @@ export component LibraryScreen inherits VerticalLayout {
     PageHeader {
         eyebrow: "B-EMU / BIBLIOTHÈQUE";
         title: "Bibliothèque";
-        subtitle: "Recherchez et organisez vos jeux. L'indexation disque arrive en Phase 2.";
+        subtitle: "Jeux indexés depuis vos dossiers. Le scan ne modifie jamais vos fichiers.";
     }
 
     GlassPanel {
@@ -52,11 +52,21 @@ export component LibraryScreen inherits VerticalLayout {
             spacing: 8px;
 
             Text {
-                text: "JEUX";
+                text: "JEUX INDEXÉS";
                 color: Theme.text-muted;
                 font-size: 10px;
                 font-weight: 700;
                 letter-spacing: 1.5px;
+            }
+
+            if root.games.length == 0: GlassPanel {
+                vertical-stretch: 1;
+                Text {
+                    text: "Aucun jeu indexé. Ajoutez un dossier dans Paramètres puis lancez une analyse.";
+                    color: Theme.text-secondary;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
             }
 
             for game[i] in root.games: ListRow {
@@ -77,7 +87,8 @@ export component LibraryScreen inherits VerticalLayout {
                     Text { text: game.system; color: Theme.text-secondary; font-size: 11px; }
                 }
 
-                Text { text: game.detail; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                Text { text: game.size; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                if game.duplicate: StatusPill { label: "DOUBLON"; positive: false; }
             }
         }
 
@@ -106,10 +117,16 @@ export component LibraryScreen inherits VerticalLayout {
                 }
 
                 Text {
-                    text: root.selected-item >= 0 && root.selected-item < root.games.length ? root.games[root.selected-item].detail : "";
+                    text: root.selected-item >= 0 && root.selected-item < root.games.length ? root.games[root.selected-item].path : "";
                     color: Theme.text-secondary;
-                    font-size: 12px;
+                    font-size: 11px;
                     wrap: word-wrap;
+                }
+
+                Text {
+                    text: root.selected-item >= 0 && root.selected-item < root.games.length ? root.games[root.selected-item].size : "";
+                    color: Theme.text-muted;
+                    font-size: 11px;
                 }
 
                 Rectangle { vertical-stretch: 1; background: transparent; }

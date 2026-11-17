@@ -2,16 +2,17 @@ import { Theme } from "../theme.slint";
 import { GlassPanel } from "../components/glass-panel.slint";
 import { PageHeader } from "../components/page-header.slint";
 import { StatusPill } from "../components/status-pill.slint";
-import { GameCard } from "../models.slint";
+import { IndexedGame } from "../models.slint";
 
 export component HomeScreen inherits VerticalLayout {
-    in property<[GameCard]> last-played;
-    in property<[GameCard]> recent-games;
+    in property<[IndexedGame]> last-played;
+    in property<[IndexedGame]> recent-games;
     in property<int> focused-item: 0;
     in property<bool> content-focused: false;
     in property<int> games-count: 0;
     in property<int> systems-count: 0;
     in property<int> emulators-count: 0;
+    in property<int> duplicates-count: 0;
 
     spacing: 20px;
 
@@ -52,7 +53,7 @@ export component HomeScreen inherits VerticalLayout {
                 spacing: 8px;
 
                 Text {
-                    text: "REPRENDRE";
+                    text: "JEU LE PLUS RÉCENT";
                     color: Theme.accent-cyan;
                     font-size: 10px;
                     font-weight: 700;
@@ -60,26 +61,26 @@ export component HomeScreen inherits VerticalLayout {
                 }
 
                 Text {
-                    text: root.last-played.length > 0 ? root.last-played[0].title : "Aucune partie en cours";
+                    text: root.last-played.length > 0 ? root.last-played[0].title : "Bibliothèque vide";
                     color: Theme.text-primary;
                     font-size: 24px;
                     font-weight: 700;
                 }
 
                 Text {
-                    text: root.last-played.length > 0 ? root.last-played[0].detail : "Les jeux joués récemment apparaîtront ici.";
+                    text: root.last-played.length > 0 ? root.last-played[0].path : "Ajoutez un dossier de jeux dans Paramètres, puis lancez une analyse.";
                     color: Theme.text-secondary;
-                    font-size: 13px;
+                    font-size: 12px;
                     wrap: word-wrap;
                 }
 
-                StatusPill { label: root.content-focused && root.focused-item == 0 ? "A · LANCER" : "A · SÉLECTIONNER"; }
+                StatusPill { label: root.content-focused && root.focused-item == 0 ? "A · DÉTAILS" : "A · SÉLECTIONNER"; }
             }
         }
     }
 
     Text {
-        text: "RÉCEMMENT JOUÉS";
+        text: "JEUX INDEXÉS";
         color: Theme.text-muted;
         font-size: 10px;
         font-weight: 700;
@@ -119,10 +120,9 @@ export component HomeScreen inherits VerticalLayout {
             }
 
             Text {
-                text: game.detail;
+                text: game.size;
                 color: Theme.text-muted;
                 font-size: 10px;
-                wrap: word-wrap;
             }
         }
     }
@@ -138,7 +138,7 @@ export component HomeScreen inherits VerticalLayout {
         GlassPanel {
             horizontal-stretch: 1;
             panel-padding: 14px;
-            Text { text: "JEUX INDEXÉS"; color: Theme.text-muted; font-size: 9px; font-weight: 700; letter-spacing: 1.2px; }
+            Text { text: "JEUX"; color: Theme.text-muted; font-size: 9px; font-weight: 700; letter-spacing: 1.2px; }
             Text { text: root.games-count; color: Theme.text-primary; font-size: 22px; font-weight: 800; }
         }
 
@@ -152,8 +152,8 @@ export component HomeScreen inherits VerticalLayout {
         GlassPanel {
             horizontal-stretch: 1;
             panel-padding: 14px;
-            Text { text: "ÉMULATEURS PRÊTS"; color: Theme.text-muted; font-size: 9px; font-weight: 700; letter-spacing: 1.2px; }
-            Text { text: root.emulators-count; color: Theme.text-primary; font-size: 22px; font-weight: 800; }
+            Text { text: "DOUBLONS"; color: Theme.text-muted; font-size: 9px; font-weight: 700; letter-spacing: 1.2px; }
+            Text { text: root.duplicates-count; color: Theme.text-primary; font-size: 22px; font-weight: 800; }
         }
     }
 }

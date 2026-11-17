@@ -126,7 +126,7 @@ This is a proposed boundary map, not a commitment to create every crate immediat
 
 ## 6. Library and persistence
 
-SQLite is the initial local index. It stores game records, detected systems, emulator associations, play history, and metadata references.
+SQLite is the initial local index. It stores game records, detected systems, emulator associations, play history, and metadata references. The Phase 2 implementation and its safety rules are documented in [PHASE-2.md](PHASE-2.md).
 
 ROM and disc image files remain in the user's chosen directories. B-Emu indexes them; it does not silently move or rewrite them.
 

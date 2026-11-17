@@ -2,6 +2,7 @@ import { Theme, Motion } from "../theme.slint";
 
 export component GlassPanel inherits Rectangle {
     in property<length> panel-padding: 22px;
+    in property<length> panel-spacing: 12px;
     in property<bool> focused: false;
     in property<bool> selected: false;
 
@@ -17,7 +18,7 @@ export component GlassPanel inherits Rectangle {
 
     VerticalLayout {
         padding: root.panel-padding;
-        spacing: 12px;
+        spacing: root.panel-spacing;
         @children
     }
 }

@@ -245,6 +245,23 @@ mod tests {
     }
 
     #[test]
+    fn hidden_directories_are_skipped() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir(dir.path().join(".hidden")).unwrap();
+        fs::write(dir.path().join(".hidden/secret.nes"), b"rom").unwrap();
+        fs::write(dir.path().join("visible.nes"), b"rom").unwrap();
+
+        let result = scan_root(
+            dir.path(),
+            &HashMap::new(),
+            &AtomicBool::new(false),
+            &mut |_| {},
+        );
+        assert_eq!(result.games.len(), 1);
+        assert_eq!(result.games[0].0.title, "visible");
+    }
+
+    #[test]
     fn cancellation_stops_the_scan() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("a.nes"), b"a").unwrap();

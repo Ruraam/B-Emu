@@ -2,10 +2,10 @@ import { Theme } from "../theme.slint";
 import { GlassPanel } from "../components/glass-panel.slint";
 import { PageHeader } from "../components/page-header.slint";
 import { StatusPill } from "../components/status-pill.slint";
-import { SystemCard } from "../models.slint";
+import { SystemStat } from "../models.slint";
 
 component SystemTile inherits GlassPanel {
-    in property<SystemCard> data;
+    in property<SystemStat> data;
     in property<bool> tile-focused: false;
     in property<bool> tile-selected: false;
 
@@ -29,12 +29,6 @@ component SystemTile inherits GlassPanel {
         font-weight: 700;
     }
 
-    Text {
-        text: root.data.manufacturer;
-        color: Theme.text-secondary;
-        font-size: 12px;
-    }
-
     Rectangle {
         vertical-stretch: 1;
         background: transparent;
@@ -47,7 +41,7 @@ component SystemTile inherits GlassPanel {
 }
 
 export component SystemsScreen inherits VerticalLayout {
-    in property<[SystemCard]> systems;
+    in property<[SystemStat]> systems;
     in property<int> focused-item: 0;
     in property<bool> content-focused: false;
 
@@ -56,13 +50,15 @@ export component SystemsScreen inherits VerticalLayout {
     PageHeader {
         eyebrow: "B-EMU / SYSTÈMES";
         title: "Systèmes";
-        subtitle: "Les plateformes détectées dans votre bibliothèque.";
+        subtitle: "Les plateformes trouvées dans votre bibliothèque indexée.";
     }
 
     GlassPanel {
         panel-padding: 14px;
         Text {
-            text: "Les systèmes sont découverts à partir de vos dossiers de jeux. L'indexation complète arrive en Phase 2.";
+            text: root.systems.length == 0
+                ? "Aucun système détecté. Ajoutez un dossier de jeux dans Paramètres, puis lancez une analyse."
+                : "Les systèmes sont déduits des extensions de fichiers. Les fichiers inconnus sont ignorés.";
             color: Theme.text-secondary;
             font-size: 12px;
             wrap: word-wrap;
@@ -86,8 +82,5 @@ export component SystemsScreen inherits VerticalLayout {
         background: transparent;
     }
 
-    StatusPill {
-        label: "↑ ↓ SYSTÈME  ·  A OUVRIR  ·  B RETOUR";
-        positive: true;
-    }
+    StatusPill { label: "↑ ↓ SYSTÈME  ·  A SÉLECTIONNER  ·  B RETOUR"; positive: true; }
 }

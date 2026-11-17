@@ -1,6 +1,6 @@
 import { Theme, Motion } from "theme.slint";
 import { SidebarItem } from "components/sidebar-item.slint";
-import { NavAction, GameCard, SystemCard, EmulatorRow } from "models.slint";
+import { NavAction, IndexedGame, SystemStat, EmulatorRow } from "models.slint";
 import { HomeScreen } from "screens/home.slint";
 import { SystemsScreen } from "screens/systems.slint";
 import { LibraryScreen } from "screens/library.slint";
@@ -21,16 +21,24 @@ export component MainWindow inherits Window {
     in-out property<bool> setting-vibration: true;
     in-out property<bool> setting-reduced-motion: false;
 
-    // Data models supplied by the Rust shell module.
+    // Data models supplied by the Rust services.
     in property<[string]> pages;
-    in property<[GameCard]> last-played;
-    in property<[GameCard]> recent-games;
-    in property<[GameCard]> library-games;
-    in property<[SystemCard]> systems;
+    in property<[IndexedGame]> last-played;
+    in property<[IndexedGame]> recent-games;
+    in property<[IndexedGame]> library-games;
+    in property<[SystemStat]> systems;
     in property<[EmulatorRow]> emulators;
     in-out property<string> search-text: "";
     in-out property<int> games-count: 0;
+    in-out property<int> systems-count: 0;
+    in-out property<int> duplicates-count: 0;
     in-out property<int> emulators-ready-count: 0;
+
+    // Library settings and scan state.
+    in property<[string]> game-dirs;
+    in-out property<string> new-dir-text: "";
+    in-out property<string> scan-status: "Prêt";
+    in-out property<float> scan-progress: 0;
 
     callback request-action(NavAction);
     callback search-changed(string);
@@ -38,6 +46,12 @@ export component MainWindow inherits Window {
     callback focus-sidebar();
     callback focus-content();
     callback set-motion-duration(duration);
+    callback add-dir(string);
+    callback remove-dir(int);
+    callback scan-now();
+    callback remove-focused-dir();
+
+    remove-focused-dir() => { root.remove-dir(root.focused-item - 3); }
 
     set-motion-duration(value) => { Motion.duration = value; }
 
@@ -196,7 +210,8 @@ export component MainWindow inherits Window {
                         last-played: root.last-played;
                         recent-games: root.recent-games;
                         games-count: root.games-count;
-                        systems-count: root.systems.length;
+                        systems-count: root.systems-count;
+                        duplicates-count: root.duplicates-count;
                         emulators-count: root.emulators-ready-count;
                         focused-item: root.focused-item;
                         content-focused: root.focus-zone == 1;
@@ -227,9 +242,16 @@ export component MainWindow inherits Window {
                         auto-scan: root.setting-auto-scan;
                         vibration: root.setting-vibration;
                         reduced-motion: root.setting-reduced-motion;
+                        game-dirs: root.game-dirs;
+                        new-dir-text: root.new-dir-text;
+                        scan-status: root.scan-status;
+                        scan-progress: root.scan-progress;
                         focused-item: root.focused-item;
                         content-focused: root.focus-zone == 1;
                         toggle-setting(index) => { root.toggle-setting(index); }
+                        add-dir(text) => { root.add-dir(text); }
+                        remove-dir(index) => { root.remove-dir(index); }
+                        scan-now() => { root.scan-now(); }
                     }
                 }
             }
