@@ -216,6 +216,29 @@ fn apply_nav_action(
     }
 }
 
+fn refresh_system_rows(
+    window: &MainWindow,
+    config_path: &Path,
+    data_dir: &Path,
+    installations: &[EmulatorInstallation],
+    bios_store: &Rc<RefCell<Vec<BiosStatus>>>,
+) {
+    let bios_ready = bios_store
+        .borrow()
+        .iter()
+        .filter(|status| status.present)
+        .count();
+    let rows: Vec<SharedString> = vec![
+        format!("Version {}", env!("CARGO_PKG_VERSION")).into(),
+        SharedString::from("Wayland natif · rendu FemtoVG / logiciel"),
+        format!("{} émulateurs détectés", installations.len()).into(),
+        format!("{} BIOS présents", bios_ready).into(),
+        format!("Config : {}", config_path.display()).into(),
+        format!("Données : {}", data_dir.display()).into(),
+    ];
+    window.set_system_rows(model(rows));
+}
+
 fn refresh_capabilities(
     window: &MainWindow,
     config_path: &Path,
@@ -778,6 +801,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     window.set_pages(model(shell::pages()));
     refresh_emulators(&window, &config_path, &installations.borrow());
     refresh_bios(
+        &window,
+        &config_path,
+        &paths.data_dir,
+        &installations.borrow(),
+        &bios_store,
+    );
+    refresh_system_rows(
         &window,
         &config_path,
         &paths.data_dir,

@@ -40,6 +40,7 @@ export component MainWindow inherits Window {
 
     // Library settings and scan state.
     in property<[string]> game-dirs;
+    in property<[string]> system-rows;
     in-out property<string> new-dir-text: "";
     in-out property<string> scan-status: "Prêt";
     in-out property<float> scan-progress: 0;
@@ -272,6 +273,7 @@ export component MainWindow inherits Window {
                         vibration: root.setting-vibration;
                         reduced-motion: root.setting-reduced-motion;
                         game-dirs: root.game-dirs;
+                        system-rows: root.system-rows;
                         new-dir-text: root.new-dir-text;
                         scan-status: root.scan-status;
                         scan-progress: root.scan-progress;
