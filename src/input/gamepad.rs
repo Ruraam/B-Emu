@@ -58,6 +58,7 @@ pub struct GamepadInput {
     gilrs: Gilrs,
     axis_states: HashMap<GamepadId, AxisState>,
     profiles: Arc<RwLock<Vec<ControllerProfile>>>,
+    button_actions: ButtonActionTracker,
     repeater: RepeatScheduler,
 }
 
@@ -76,6 +77,7 @@ impl GamepadInput {
             gilrs,
             axis_states: HashMap::new(),
             profiles,
+            button_actions: ButtonActionTracker::default(),
             repeater: RepeatScheduler::default(),
         })
     }
@@ -148,12 +150,14 @@ impl GamepadInput {
                 }
                 EventType::Disconnected => {
                     self.axis_states.remove(&id);
+                    self.button_actions.release_gamepad(numeric_id);
                     self.repeater.release_gamepad(numeric_id);
                     translated.push(GamepadEvent::Disconnected { id: numeric_id });
                 }
                 EventType::ButtonPressed(button, _) => {
                     if let Some(action) = button_action(button).map(|action| self.remap(id, action))
                     {
+                        self.button_actions.press(numeric_id, button, action);
                         translated.push(GamepadEvent::Action {
                             id: numeric_id,
                             action,
@@ -164,9 +168,12 @@ impl GamepadInput {
                     }
                 }
                 EventType::ButtonReleased(button, _) => {
-                    if let Some(action) =
-                        button_action(button).filter(|a| is_repeatable_direction(*a))
-                    {
+                    let action = self
+                        .button_actions
+                        .release(numeric_id, button)
+                        .or_else(|| button_action(button).map(|action| self.remap(id, action)));
+
+                    if let Some(action) = action.filter(|a| is_repeatable_direction(*a)) {
                         self.repeater.release(numeric_id, action);
                     }
                 }
@@ -197,6 +204,26 @@ impl GamepadInput {
         );
 
         translated
+    }
+}
+
+#[derive(Debug, Default)]
+struct ButtonActionTracker {
+    pressed: HashMap<(usize, Button), GamepadAction>,
+}
+
+impl ButtonActionTracker {
+    fn press(&mut self, id: usize, button: Button, action: GamepadAction) {
+        self.pressed.insert((id, button), action);
+    }
+
+    fn release(&mut self, id: usize, button: Button) -> Option<GamepadAction> {
+        self.pressed.remove(&(id, button))
+    }
+
+    fn release_gamepad(&mut self, id: usize) {
+        self.pressed
+            .retain(|(gamepad_id, _), _| *gamepad_id != id);
     }
 }
 
@@ -360,8 +387,8 @@ impl AxisState {
 #[cfg(test)]
 mod tests {
     use super::{
-        AxisDirection, AxisGate, AxisState, REPEAT_DELAY, REPEAT_INTERVAL, button_action,
-        is_repeatable_direction,
+        AxisDirection, AxisGate, AxisState, ButtonActionTracker, REPEAT_DELAY, REPEAT_INTERVAL,
+        button_action, is_repeatable_direction,
     };
     use crate::input::GamepadAction;
     use gilrs::{Axis, Button};
@@ -415,6 +442,45 @@ mod tests {
         assert!(!is_repeatable_direction(GamepadAction::Back));
         assert_eq!(REPEAT_DELAY, Duration::from_millis(400));
         assert_eq!(REPEAT_INTERVAL, Duration::from_millis(120));
+    }
+
+    #[test]
+    fn remapped_button_release_clears_the_original_action_repeat_state() {
+        use super::RepeatScheduler;
+        use std::time::Instant;
+
+        let start = Instant::now();
+        let mut pressed = ButtonActionTracker::default();
+        let mut repeater = RepeatScheduler::default();
+
+        // The profile maps the physical D-pad Up button to NavigateDown.
+        let mapped_action = GamepadAction::NavigateDown;
+        pressed.press(0, Button::DPadUp, mapped_action);
+        repeater.press(0, mapped_action, start);
+
+        // Release must use the action captured at press time, not the
+        // physical button's default NavigateUp action.
+        let released_action = pressed.release(0, Button::DPadUp).unwrap();
+        assert_eq!(released_action, GamepadAction::NavigateDown);
+        repeater.release(0, released_action);
+
+        assert!(repeater.due(start + REPEAT_DELAY + REPEAT_INTERVAL).is_empty());
+        assert!(pressed.release(0, Button::DPadUp).is_none());
+    }
+
+    #[test]
+    fn disconnect_clears_pressed_button_mappings() {
+        let mut pressed = ButtonActionTracker::default();
+        pressed.press(0, Button::DPadUp, GamepadAction::NavigateDown);
+        pressed.press(1, Button::DPadUp, GamepadAction::NavigateUp);
+
+        pressed.release_gamepad(0);
+
+        assert!(pressed.release(0, Button::DPadUp).is_none());
+        assert_eq!(
+            pressed.release(1, Button::DPadUp),
+            Some(GamepadAction::NavigateUp)
+        );
     }
 
     #[test]
