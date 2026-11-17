@@ -87,7 +87,7 @@ jobs:
           #!/usr/bin/env bash
           set -euo pipefail
           case "$1" in
-            pack) : > "$4" ;;
+            pack) printf "fake-lpk\\n" > "$4" ;;
             inspect) test -s "$2" ;;
             *) echo "Unexpected fake ULPM command: $1" >&2; exit 1 ;;
           esac
