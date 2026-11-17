@@ -59,7 +59,7 @@ fn parse_tags(stem: &str) -> (String, Option<i32>, String) {
 }
 
 /// Local filename provider. Provenance is always "filename".
-pub fn from_filename(game: &GameRecord) -> Metadata {
+pub fn from_filename(game: &GameRecord) -> Option<Metadata> {
     let stem = game
         .path
         .file_stem()
@@ -67,8 +67,8 @@ pub fn from_filename(game: &GameRecord) -> Metadata {
         .unwrap_or("");
     let (title, year, region) = parse_tags(stem);
 
-    Metadata {
-        path: game.path.to_string_lossy().into_owned(),
+    Some(Metadata {
+        path: game.path.to_str()?.to_owned(),
         title: if title.is_empty() {
             stem.to_owned()
         } else {
@@ -78,7 +78,7 @@ pub fn from_filename(game: &GameRecord) -> Metadata {
         year,
         region,
         provider: "filename".to_owned(),
-    }
+    })
 }
 
 /// Looks for a sibling image and copies it into the artwork cache.
@@ -97,7 +97,7 @@ pub fn sidecar_artwork(game: &GameRecord, cache_dir: &Path) -> Option<Artwork> {
             fs::copy(&sibling, &cache_path).ok()?;
         }
         return Some(Artwork {
-            path: game.path.to_string_lossy().into_owned(),
+            path: game.path.to_str()?.to_owned(),
             cache_path,
             source: "sidecar".to_owned(),
         });
@@ -125,7 +125,7 @@ mod tests {
     #[test]
     fn filename_provider_extracts_title_year_and_region() {
         let record = game(PathBuf::from("/roms/Chrono Trigger (USA) (1995).sfc"));
-        let metadata = from_filename(&record);
+        let metadata = from_filename(&record).unwrap();
         assert_eq!(metadata.title, "Chrono Trigger");
         assert_eq!(metadata.year, Some(1995));
         assert_eq!(metadata.region, "USA");
