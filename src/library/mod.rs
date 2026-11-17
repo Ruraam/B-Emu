@@ -193,9 +193,7 @@ impl Library {
         // One transaction: a crash cannot leave a half-written index. Prune
         // only roots that were accessible and scanned without any errors.
         // Successful roots can still be updated when another root fails.
-        report.removed = self
-            .db
-            .apply_scan(&discovered, &seen, &completed_roots)?;
+        report.removed = self.db.apply_scan(&discovered, &seen, &completed_roots)?;
         Ok(report)
     }
 }
@@ -257,13 +255,17 @@ mod tests {
         fs::write(&path, b"rom").unwrap();
 
         let mut library = Library::open_in_memory().unwrap();
-        library.scan(&[roms.clone()], &AtomicBool::new(false), &mut |_| {}).unwrap();
+        library
+            .scan(&[roms.clone()], &AtomicBool::new(false), &mut |_| {})
+            .unwrap();
         let key = path.to_string_lossy().to_string();
         library.toggle_favorite(&key).unwrap();
         library.mark_played(&key).unwrap();
 
         fs::remove_dir_all(&roms).unwrap();
-        let report = library.scan(&[roms], &AtomicBool::new(false), &mut |_| {}).unwrap();
+        let report = library
+            .scan(&[roms], &AtomicBool::new(false), &mut |_| {})
+            .unwrap();
 
         assert_eq!(report.removed, 0);
         assert_eq!(report.errors, 1);
