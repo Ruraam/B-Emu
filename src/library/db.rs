@@ -3,6 +3,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fs,
+    io,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -56,17 +57,28 @@ const UPSERT_GAME_SQL: &str =
         checksum = excluded.checksum,
         source_dir = excluded.source_dir";
 
+fn path_to_text(path: &Path) -> Result<&str, rusqlite::Error> {
+    path.to_str().ok_or_else(|| {
+        rusqlite::Error::ToSqlConversionFailure(Box::new(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "filesystem path is not valid UTF-8",
+        )))
+    })
+}
+
 fn upsert_on(conn: &Connection, game: &ScannedGame) -> Result<(), rusqlite::Error> {
+    let path = path_to_text(&game.path)?;
+    let source_dir = path_to_text(&game.source_dir)?;
     conn.execute(
         UPSERT_GAME_SQL,
         params![
-            game.path.to_string_lossy(),
+            path,
             game.title,
             game.system,
             game.size,
             game.modified_ns,
             game.checksum,
-            game.source_dir.to_string_lossy(),
+            source_dir,
         ],
     )?;
     Ok(())
@@ -86,8 +98,7 @@ fn remove_paths_on(
     let mut removed = 0;
     for path in paths {
         if !seen.contains(&path) {
-            let key = path.to_string_lossy();
-            let key = key.as_ref();
+            let key = path_to_text(&path)?;
             removed += conn.execute("DELETE FROM games WHERE path = ?1", params![key])?;
             conn.execute("DELETE FROM favorites WHERE path = ?1", params![key])?;
             conn.execute("DELETE FROM play_history WHERE path = ?1", params![key])?;
@@ -423,7 +434,7 @@ impl LibraryDb {
                 cache_path = excluded.cache_path, source = excluded.source",
             params![
                 artwork.path,
-                artwork.cache_path.to_string_lossy(),
+                path_to_text(&artwork.cache_path)?,
                 artwork.source,
                 now_ns(),
             ],
