@@ -6,7 +6,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 ULPM="${ULPM:-ulpm}"
-OUT="${OUT:-target/b-emu_amd64.lpk}"
+ARCH="${ARCH:-amd64}"
+OUT="${OUT:-target/b-emu_${ARCH}.lpk}"
 REPO_DIR="${REPO_DIR:-target/repo}"
 KEY_DIR="${KEY_DIR:-target/release-keys}"
 RELEASE_KEY="${RELEASE_KEY:-$KEY_DIR/b-emu-release.priv}"
@@ -16,7 +17,7 @@ command -v "$ULPM" >/dev/null || {
     exit 1
 }
 
-bash scripts/package-lpk.sh
+ARCH="$ARCH" OUT="$OUT" ULPM="$ULPM" bash scripts/package-lpk.sh
 
 mkdir -p "$KEY_DIR" "$REPO_DIR"
 if [[ ! -f "$RELEASE_KEY" ]]; then
