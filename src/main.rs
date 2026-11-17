@@ -3,7 +3,10 @@ use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     rc::Rc,
-    sync::{Arc, RwLock},
+    sync::{
+        Arc, RwLock,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use b_emu::{
@@ -84,7 +87,7 @@ fn set_motion_duration(window: &MainWindow, reduced: bool) {
     window.invoke_set_motion_duration(nanos);
 }
 
-fn toggle_setting(window: &MainWindow, index: i32) {
+fn toggle_setting(window: &MainWindow, index: i32, vibration: &Arc<AtomicBool>) {
     match index {
         0 => {
             let value = window.get_setting_auto_scan();
@@ -93,6 +96,7 @@ fn toggle_setting(window: &MainWindow, index: i32) {
         1 => {
             let value = window.get_setting_vibration();
             window.set_setting_vibration(!value);
+            vibration.store(!value, Ordering::Relaxed);
         }
         2 => {
             let value = window.get_setting_reduced_motion();
@@ -110,6 +114,7 @@ fn apply_nav_action(
     db_path: &Path,
     installations: &[EmulatorInstallation],
     bios_store: &Rc<RefCell<Vec<BiosStatus>>>,
+    vibration: &Arc<AtomicBool>,
     action: NavAction,
 ) {
     let gamepad_action = action_from_nav(action);
@@ -191,7 +196,7 @@ fn apply_nav_action(
                 refresh_capabilities(window, config_path, installations);
                 refresh_selected_bios(window, installations, bios_store);
             }
-            4 => activate_settings_item(window, next.focused_item),
+            4 => activate_settings_item(window, next.focused_item, vibration),
             _ => {}
         }
     }
@@ -704,10 +709,10 @@ fn start_scan(
     }
 }
 
-fn activate_settings_item(window: &MainWindow, index: i32) {
+fn activate_settings_item(window: &MainWindow, index: i32, vibration: &Arc<AtomicBool>) {
     let dirs = window.get_game_dirs().row_count() as i32;
     if index < 3 {
-        toggle_setting(window, index);
+        toggle_setting(window, index, vibration);
     } else if index < 3 + dirs {
         window.invoke_remove_focused_dir();
     } else if index == 3 + dirs {
@@ -753,6 +758,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("[b-emu] could not load library index: {error}");
     }
 
+    let vibration = Arc::new(AtomicBool::new(true));
     let scan_slot: Rc<RefCell<Option<scan_worker::ScanWorker>>> = Rc::new(RefCell::new(None));
     let launch_slots: Rc<RefCell<Vec<launch_worker::LaunchWorker>>> =
         Rc::new(RefCell::new(Vec::new()));
@@ -762,16 +768,26 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let db = db_path.clone();
     let installs = Rc::clone(&installations);
     let bios = Rc::clone(&bios_store);
+    let vibration_for_nav = Arc::clone(&vibration);
     window.on_request_action(move |action| {
         if let Some(window) = weak.upgrade() {
-            apply_nav_action(&window, &config, &db, &installs.borrow(), &bios, action);
+            apply_nav_action(
+                &window,
+                &config,
+                &db,
+                &installs.borrow(),
+                &bios,
+                &vibration_for_nav,
+                action,
+            );
         }
     });
 
     let weak = window.as_weak();
+    let vibration_for_setting = Arc::clone(&vibration);
     window.on_toggle_setting(move |index| {
         if let Some(window) = weak.upgrade() {
-            toggle_setting(&window, index);
+            toggle_setting(&window, index, &vibration_for_setting);
         }
     });
 
@@ -928,13 +944,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             .map(|config| config.controller_profiles)
             .unwrap_or_default(),
     ));
-    let _gamepad_worker = match gamepad_worker::GamepadWorker::start(window.as_weak(), profiles) {
-        Ok(worker) => Some(worker),
-        Err(error) => {
-            eprintln!("[b-emu] could not start gamepad worker: {error}");
-            None
-        }
-    };
+    let _gamepad_worker =
+        match gamepad_worker::GamepadWorker::start(window.as_weak(), profiles, vibration) {
+            Ok(worker) => Some(worker),
+            Err(error) => {
+                eprintln!("[b-emu] could not start gamepad worker: {error}");
+                None
+            }
+        };
 
     window.run()?;
     Ok(())

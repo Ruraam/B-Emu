@@ -3,13 +3,16 @@
 use std::{
     sync::{
         Arc, RwLock,
+        atomic::{AtomicBool, Ordering},
         mpsc::{self, Receiver, Sender, TryRecvError},
     },
     thread::{self, JoinHandle},
     time::Duration,
 };
 
-use b_emu::input::{GamepadAction, GamepadEvent, GamepadInput, profiles::ControllerProfile};
+use b_emu::input::{
+    GamepadAction, GamepadEvent, GamepadInput, diagnostics, profiles::ControllerProfile,
+};
 
 use crate::{MainWindow, NavAction};
 
@@ -28,11 +31,12 @@ impl GamepadWorker {
     pub fn start(
         window: slint::Weak<MainWindow>,
         profiles: Arc<RwLock<Vec<ControllerProfile>>>,
+        vibration: Arc<AtomicBool>,
     ) -> std::io::Result<Self> {
         let (stop_tx, stop_rx) = mpsc::channel();
         let thread = thread::Builder::new()
             .name("b-emu-gamepad".into())
-            .spawn(move || run_worker(window, stop_rx, profiles))?;
+            .spawn(move || run_worker(window, stop_rx, profiles, vibration))?;
 
         Ok(Self {
             stop: Some(stop_tx),
@@ -99,11 +103,13 @@ fn run_worker(
     window: slint::Weak<MainWindow>,
     stop_rx: Receiver<()>,
     profiles: Arc<RwLock<Vec<ControllerProfile>>>,
+    vibration: Arc<AtomicBool>,
 ) {
     let mut input = match GamepadInput::new_with_profiles(profiles) {
         Ok(input) => input,
         Err(error) => {
             eprintln!("[b-emu] gamepad support unavailable: {error}");
+            diagnostics::log_input_diagnostic();
             return;
         }
     };
@@ -124,6 +130,7 @@ fn run_worker(
         }
 
         let mut actions = Vec::new();
+        let mut last_action_id = None;
 
         for event in input.poll_events() {
             match event {
@@ -140,6 +147,7 @@ fn run_worker(
                 }
                 GamepadEvent::Action { id, action } => {
                     if active.accepts(id) {
+                        last_action_id = Some(id);
                         actions.push(nav_action(action));
                     }
                 }
@@ -150,6 +158,18 @@ fn run_worker(
         // action order while preventing rapid input from flooding Slint's
         // event queue with one callback per low-level controller event.
         if !actions.is_empty() {
+            if vibration.load(Ordering::Relaxed) {
+                if let Some(id) = last_action_id {
+                    let strong = actions.iter().any(|action| {
+                        matches!(
+                            action,
+                            NavAction::Confirm | NavAction::Favorite | NavAction::Played
+                        )
+                    });
+                    input.pulse(id, strong);
+                }
+            }
+
             let action_count = actions.len();
             let result = window.upgrade_in_event_loop(move |ui| {
                 for action in actions {

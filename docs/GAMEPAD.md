@@ -12,8 +12,12 @@ events into the normalized actions in `input::GamepadAction`.
 - UI updates are delivered with Slint's
   `Weak::upgrade_in_event_loop` API.
 - The worker is stopped and joined when the main window's event loop returns.
-- If the gamepad subsystem cannot initialize, B-Emu logs a diagnostic and
+- If the gamepad subsystem cannot initialize, B-Emu logs an actionable
+  diagnostic (readable input nodes, seat/session ACLs, runtime directory) and
   continues with keyboard and mouse input.
+- When "Retour de force" is enabled and the controller supports force
+  feedback, navigation actions play a short weak pulse and confirmation
+  actions a stronger one. Controllers without force feedback are unaffected.
 - Controller disconnects are logged and do not terminate the application.
 - When several controllers are connected, the first one owns navigation.
   Actions from other controllers are ignored until it disconnects, so two

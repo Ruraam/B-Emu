@@ -1,6 +1,7 @@
 //! Native gamepad input support.
 
 pub mod actions;
+pub mod diagnostics;
 pub mod gamepad;
 pub mod navigation;
 pub mod profiles;

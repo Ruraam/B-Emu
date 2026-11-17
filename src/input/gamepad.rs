@@ -5,7 +5,10 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use gilrs::{Axis, Button, EventType, GamepadId, Gilrs};
+use gilrs::{
+    Axis, Button, EventType, GamepadId, Gilrs,
+    ff::{BaseEffect, BaseEffectType, EffectBuilder, Replay, Ticks},
+};
 
 use super::{
     actions::GamepadAction,
@@ -72,6 +75,31 @@ impl GamepadInput {
             axis_states: HashMap::new(),
             profiles,
         })
+    }
+
+    /// Plays a short rumble pulse when the controller supports force feedback.
+    pub fn pulse(&mut self, id: usize, strong: bool) {
+        let Some(gamepad_id) = self.gilrs.gamepads().find_map(|(gamepad_id, gamepad)| {
+            (usize::from(gamepad_id) == id && gamepad.is_ff_supported()).then_some(gamepad_id)
+        }) else {
+            return;
+        };
+
+        let magnitude = if strong { 30_000 } else { 9_000 };
+        let effect = EffectBuilder::new()
+            .add_effect(BaseEffect {
+                kind: BaseEffectType::Weak { magnitude },
+                scheduling: Replay {
+                    play_for: Ticks::from_ms(35),
+                    ..Default::default()
+                },
+                envelope: Default::default(),
+            })
+            .gamepads(&[gamepad_id])
+            .finish(&mut self.gilrs);
+        if let Ok(effect) = effect {
+            let _ = effect.play();
+        }
     }
 
     fn remap(&self, id: GamepadId, action: GamepadAction) -> GamepadAction {
