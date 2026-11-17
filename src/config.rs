@@ -1,6 +1,7 @@
 //! Typed user configuration stored under the XDG config directory.
 
 use std::{
+    collections::{BTreeMap, BTreeSet},
     fs, io,
     path::{Path, PathBuf},
 };
@@ -12,6 +13,9 @@ pub struct Config {
     /// Game directories to scan. Absolute paths only; never written to by the scanner.
     #[serde(default)]
     pub game_dirs: Vec<PathBuf>,
+    /// Capability settings keyed by emulator id, then capability key.
+    #[serde(default)]
+    pub emulator_settings: BTreeMap<String, BTreeMap<String, bool>>,
 }
 
 #[derive(Debug)]
@@ -85,6 +89,30 @@ impl Config {
         self.game_dirs.retain(|candidate| candidate != dir);
         self.game_dirs.len() != before
     }
+
+    /// Only capability keys explicitly enabled by the user are returned.
+    pub fn enabled_capabilities(&self, emulator_id: &str) -> BTreeSet<String> {
+        self.emulator_settings
+            .get(emulator_id)
+            .map(|settings| {
+                settings
+                    .iter()
+                    .filter(|(_, enabled)| **enabled)
+                    .map(|(key, _)| key.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    pub fn toggle_capability(&mut self, emulator_id: &str, key: &str) -> bool {
+        let entry = self
+            .emulator_settings
+            .entry(emulator_id.to_owned())
+            .or_default();
+        let enabled = !entry.get(key).copied().unwrap_or(false);
+        entry.insert(key.to_owned(), enabled);
+        enabled
+    }
 }
 
 #[cfg(test)]
@@ -131,6 +159,19 @@ mod tests {
         let path = dir.path().join("config.json");
         std::fs::write(&path, b"{ not json }").unwrap();
         assert!(matches!(Config::load(&path), Err(ConfigError::Json(_))));
+    }
+
+    #[test]
+    fn capability_settings_are_opt_in() {
+        let mut config = Config::default();
+        assert!(config.enabled_capabilities("retroarch").is_empty());
+        assert!(config.toggle_capability("retroarch", "fullscreen"));
+        assert_eq!(
+            config.enabled_capabilities("retroarch"),
+            ["fullscreen".to_string()].into_iter().collect()
+        );
+        assert!(!config.toggle_capability("retroarch", "fullscreen"));
+        assert!(config.enabled_capabilities("retroarch").is_empty());
     }
 
     #[test]
