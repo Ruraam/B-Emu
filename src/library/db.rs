@@ -481,6 +481,26 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn database_rejects_non_utf8_paths_instead_of_coercing_them() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let db = LibraryDb::open_in_memory().unwrap();
+        let invalid = ScannedGame {
+            path: PathBuf::from(std::ffi::OsString::from_vec(b"/roms/rom-\\xff.nes".to_vec())),
+            title: "rom".to_owned(),
+            system: "Nintendo".to_owned(),
+            size: 1,
+            modified_ns: 1,
+            checksum: "hash".to_owned(),
+            source_dir: PathBuf::from("/roms"),
+        };
+
+        assert!(db.upsert(&invalid).is_err());
+        assert!(db.games().unwrap().is_empty());
+    }
+
     #[test]
     fn upsert_and_query() {
         let db = LibraryDb::open_in_memory().unwrap();
