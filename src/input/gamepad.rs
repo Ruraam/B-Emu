@@ -1,10 +1,16 @@
 //! Linux gamepad discovery and event normalization through GilRs.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use gilrs::{Axis, Button, EventType, GamepadId, Gilrs};
 
-use super::actions::GamepadAction;
+use super::{
+    actions::GamepadAction,
+    profiles::{ControllerProfile, format_guid, match_profile},
+};
 
 /// Error returned when the gamepad subsystem cannot be initialized.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,17 +53,38 @@ pub enum GamepadEvent {
 pub struct GamepadInput {
     gilrs: Gilrs,
     axis_states: HashMap<GamepadId, AxisState>,
+    profiles: Arc<RwLock<Vec<ControllerProfile>>>,
 }
 
 impl GamepadInput {
     pub fn new() -> Result<Self, GamepadError> {
+        Self::new_with_profiles(Arc::new(RwLock::new(Vec::new())))
+    }
+
+    pub fn new_with_profiles(
+        profiles: Arc<RwLock<Vec<ControllerProfile>>>,
+    ) -> Result<Self, GamepadError> {
         let gilrs =
             Gilrs::new().map_err(|error| GamepadError::Initialization(format!("{error:?}")))?;
 
         Ok(Self {
             gilrs,
             axis_states: HashMap::new(),
+            profiles,
         })
+    }
+
+    fn remap(&self, id: GamepadId, action: GamepadAction) -> GamepadAction {
+        let gamepad = self.gilrs.gamepad(id);
+        let name = gamepad.name().to_owned();
+        let guid = format_guid(gamepad.uuid());
+        let profiles = self
+            .profiles
+            .read()
+            .unwrap_or_else(|error| error.into_inner());
+        match_profile(&profiles, &name, &guid)
+            .map(|profile| profile.apply(action))
+            .unwrap_or(action)
     }
 
     /// Returns the controllers already connected when the subsystem was created.
@@ -96,7 +123,7 @@ impl GamepadInput {
                     if let Some(action) = button_action(button) {
                         translated.push(GamepadEvent::Action {
                             id: numeric_id,
-                            action,
+                            action: self.remap(id, action),
                         });
                     }
                 }
@@ -106,7 +133,7 @@ impl GamepadInput {
                     {
                         translated.push(GamepadEvent::Action {
                             id: numeric_id,
-                            action,
+                            action: self.remap(id, action),
                         });
                     }
                 }

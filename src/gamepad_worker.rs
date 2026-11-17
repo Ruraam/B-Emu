@@ -1,12 +1,15 @@
 //! Background gamepad polling and safe delivery to the Slint event loop.
 
 use std::{
-    sync::mpsc::{self, Receiver, Sender, TryRecvError},
+    sync::{
+        Arc, RwLock,
+        mpsc::{self, Receiver, Sender, TryRecvError},
+    },
     thread::{self, JoinHandle},
     time::Duration,
 };
 
-use b_emu::input::{GamepadAction, GamepadEvent, GamepadInput};
+use b_emu::input::{GamepadAction, GamepadEvent, GamepadInput, profiles::ControllerProfile};
 
 use crate::{MainWindow, NavAction};
 
@@ -22,11 +25,14 @@ impl GamepadWorker {
     /// Failure to spawn the thread is returned to the caller. Failure to
     /// initialize the optional gamepad subsystem is logged by the worker and
     /// does not prevent keyboard/mouse use of the application.
-    pub fn start(window: slint::Weak<MainWindow>) -> std::io::Result<Self> {
+    pub fn start(
+        window: slint::Weak<MainWindow>,
+        profiles: Arc<RwLock<Vec<ControllerProfile>>>,
+    ) -> std::io::Result<Self> {
         let (stop_tx, stop_rx) = mpsc::channel();
         let thread = thread::Builder::new()
             .name("b-emu-gamepad".into())
-            .spawn(move || run_worker(window, stop_rx))?;
+            .spawn(move || run_worker(window, stop_rx, profiles))?;
 
         Ok(Self {
             stop: Some(stop_tx),
@@ -89,8 +95,12 @@ impl ActiveController {
     }
 }
 
-fn run_worker(window: slint::Weak<MainWindow>, stop_rx: Receiver<()>) {
-    let mut input = match GamepadInput::new() {
+fn run_worker(
+    window: slint::Weak<MainWindow>,
+    stop_rx: Receiver<()>,
+    profiles: Arc<RwLock<Vec<ControllerProfile>>>,
+) {
+    let mut input = match GamepadInput::new_with_profiles(profiles) {
         Ok(input) => input,
         Err(error) => {
             eprintln!("[b-emu] gamepad support unavailable: {error}");

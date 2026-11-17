@@ -3,6 +3,7 @@ use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     rc::Rc,
+    sync::{Arc, RwLock},
 };
 
 use b_emu::{
@@ -922,7 +923,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         start_scan(&window, &config_path, &db_path, &cache_dir, &scan_slot);
     }
 
-    let _gamepad_worker = match gamepad_worker::GamepadWorker::start(window.as_weak()) {
+    let profiles = Arc::new(RwLock::new(
+        Config::load(&config_path)
+            .map(|config| config.controller_profiles)
+            .unwrap_or_default(),
+    ));
+    let _gamepad_worker = match gamepad_worker::GamepadWorker::start(window.as_weak(), profiles) {
         Ok(worker) => Some(worker),
         Err(error) => {
             eprintln!("[b-emu] could not start gamepad worker: {error}");

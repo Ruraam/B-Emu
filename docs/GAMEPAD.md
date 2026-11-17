@@ -53,6 +53,31 @@ The pure transition function lives in `input::navigation` and is unit-tested
 without a window. The gamepad worker forwards normalized actions to Slint,
 which calls back into that same function through one shared navigation path.
 
+## Controller profiles
+
+Controllers whose buttons differ from the default mapping can be remapped
+through `controller_profiles` in `config.json`. A profile matches a device by
+name substring or 16-byte GUID and maps default action keys (`up`, `down`,
+`left`, `right`, `confirm`, `back`, `favorite`, `played`) to other actions:
+
+```json
+{
+  "controller_profiles": [
+    {
+      "id": "inverted-ab",
+      "name": "Inverted A/B",
+      "device_name_contains": "My Arcade Pad",
+      "remap": { "confirm": "back", "back": "confirm" }
+    }
+  ]
+}
+```
+
+The first matching profile wins. Profiles are applied when events are
+normalized, before they reach the navigation state, so the rest of the
+application stays controller-model independent. Changes are read at startup;
+restart B-Emu after editing the file.
+
 ## Permissions and rootless operation
 
 B-Emu does not request root privileges, change device-node permissions, add

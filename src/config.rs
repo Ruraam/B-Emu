@@ -22,6 +22,9 @@ pub struct Config {
     /// Optional executable override per emulator id (name on PATH or absolute path).
     #[serde(default)]
     pub emulator_executables: BTreeMap<String, String>,
+    /// Optional per-controller action remapping profiles.
+    #[serde(default)]
+    pub controller_profiles: Vec<crate::input::profiles::ControllerProfile>,
 }
 
 #[derive(Debug)]
