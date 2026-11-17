@@ -1,6 +1,7 @@
 //! Emulator discovery on PATH and version probing.
 
 use std::{
+    collections::BTreeMap,
     env,
     ffi::OsStr,
     fs,
@@ -10,6 +11,8 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+
+use crate::{config::Config, paths::AppPaths};
 
 use super::adapters::{ADAPTERS, Adapter, Capability};
 
@@ -93,15 +96,31 @@ fn probe_version(executable: &Path, args: &[&str]) -> Option<String> {
 }
 
 /// Discovers emulators. `probe` is injectable so tests never spawn real
-/// emulators.
-pub fn discover_with(
+/// emulators. Explicit config overrides take precedence over PATH aliases.
+pub fn discover_with_overrides(
     path_var: Option<&OsStr>,
+    overrides: &BTreeMap<String, String>,
     probe: &dyn Fn(&Path, &[&str]) -> Option<String>,
 ) -> Vec<EmulatorInstallation> {
     ADAPTERS
         .iter()
         .filter_map(|adapter| {
-            let executable = find_executable(adapter.executable, path_var)?;
+            let executable = overrides
+                .get(adapter.id)
+                .and_then(|value| {
+                    let path = PathBuf::from(value);
+                    if path.is_absolute() {
+                        is_executable(&path).then_some(path)
+                    } else {
+                        find_executable(value, path_var)
+                    }
+                })
+                .or_else(|| {
+                    adapter
+                        .executables
+                        .iter()
+                        .find_map(|name| find_executable(name, path_var))
+                })?;
             let version = probe(&executable, adapter.version_args);
             Some(EmulatorInstallation {
                 adapter,
@@ -121,8 +140,20 @@ pub fn discover_with(
         .collect()
 }
 
+pub fn discover_with(
+    path_var: Option<&OsStr>,
+    probe: &dyn Fn(&Path, &[&str]) -> Option<String>,
+) -> Vec<EmulatorInstallation> {
+    discover_with_overrides(path_var, &BTreeMap::new(), probe)
+}
+
 pub fn discover() -> Vec<EmulatorInstallation> {
-    discover_with(env::var_os("PATH").as_deref(), &probe_version)
+    let overrides = AppPaths::from_env()
+        .ok()
+        .and_then(|paths| Config::load(&paths.config_dir.join("config.json")).ok())
+        .map(|config| config.emulator_executables)
+        .unwrap_or_default();
+    discover_with_overrides(env::var_os("PATH").as_deref(), &overrides, &probe_version)
 }
 
 #[cfg(test)]
@@ -169,6 +200,23 @@ mod tests {
                 .all(|install| install.version.as_deref() == Some("9.9.9"))
         );
         assert!(installations.iter().all(|install| install.available));
+    }
+
+    #[test]
+    fn executable_override_is_used() {
+        let dir = tempfile::tempdir().unwrap();
+        let custom = dir.path().join("my-retroarch");
+        fs::write(&custom, b"ignored").unwrap();
+        fs::set_permissions(&custom, fs::Permissions::from_mode(0o755)).unwrap();
+        let path = OsString::from(dir.path());
+        let overrides = std::collections::BTreeMap::from([(
+            "retroarch".to_string(),
+            custom.to_string_lossy().to_string(),
+        )]);
+
+        let found = super::discover_with_overrides(Some(&path), &overrides, &|_, _| None);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].executable, custom);
     }
 
     #[test]

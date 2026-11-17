@@ -98,7 +98,7 @@ mod tests {
         const ADAPTER: Adapter = Adapter {
             id: "fake",
             name: "Fake",
-            executable: "/bin/echo",
+            executables: &["/bin/echo"],
             systems: &["Test"],
             extensions: &["rom"],
             version_args: &[],

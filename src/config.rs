@@ -19,6 +19,9 @@ pub struct Config {
     /// Capability settings keyed by emulator id, then capability key.
     #[serde(default)]
     pub emulator_settings: BTreeMap<String, BTreeMap<String, bool>>,
+    /// Optional executable override per emulator id (name on PATH or absolute path).
+    #[serde(default)]
+    pub emulator_executables: BTreeMap<String, String>,
 }
 
 #[derive(Debug)]

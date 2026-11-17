@@ -22,10 +22,19 @@ or shown. Capability values are stored per emulator id under
 
 ## Discovery
 
-`discovery.rs` searches `PATH` for declared executables and probes their
-version with a bounded two-second timeout. A missing or non-executable binary
-is simply not reported. Discovery uses an injectable probe in tests so no real
-emulator is ever started.
+`discovery.rs` searches `PATH` for declared executable aliases and probes their
+version with a bounded two-second timeout. The registry currently covers over
+thirty emulators (RetroArch, Dolphin, PCSX2, PPSSPP, MAME, DuckStation,
+Mednafen, bsnes, Snes9x, Mesen, FCEUX, Nestopia, VisualBoyAdvance, mGBA,
+SameBoy, Gambatte, Yabause, Redream, Flycast, Citra, Yuzu, RPCS3, melonDS,
+DeSmuME, DOSBox, ScummVM, VICE, Hatari, Fuse, openMSX, ares, …).
+
+Adding another emulator is one `adapter!` entry in `adapters.rs`: id, display
+name, executable aliases, systems, extensions, version arguments, declared
+capabilities, BIOS requirements and an argument builder. Users can override an
+executable per emulator id through `emulator_executables` in `config.json` for
+custom builds. A missing or non-executable binary is simply not reported, and
+discovery uses an injectable probe in tests so no real emulator is started.
 
 ## Safe launching
 
