@@ -9,7 +9,7 @@ use std::{
 
 use rusqlite::{Connection, params};
 
-use super::scanner::{KnownFile, ScannedGame};
+use super::scanner::{KnownFile, ScanOutcome, ScannedGame};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GameRecord {
@@ -43,6 +43,53 @@ fn now_ns() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_nanos() as i64)
         .unwrap_or(0)
+}
+
+const UPSERT_GAME_SQL: &str =
+    "INSERT INTO games (path, title, system, size, modified_ns, checksum, source_dir)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+     ON CONFLICT(path) DO UPDATE SET
+        title = excluded.title,
+        system = excluded.system,
+        size = excluded.size,
+        modified_ns = excluded.modified_ns,
+        checksum = excluded.checksum,
+        source_dir = excluded.source_dir";
+
+fn upsert_on(conn: &Connection, game: &ScannedGame) -> Result<(), rusqlite::Error> {
+    conn.execute(
+        UPSERT_GAME_SQL,
+        params![
+            game.path.to_string_lossy(),
+            game.title,
+            game.system,
+            game.size,
+            game.modified_ns,
+            game.checksum,
+            game.source_dir.to_string_lossy(),
+        ],
+    )?;
+    Ok(())
+}
+
+fn all_paths_on(conn: &Connection) -> Result<Vec<PathBuf>, rusqlite::Error> {
+    let mut statement = conn.prepare("SELECT path FROM games")?;
+    let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+    rows.map(|row| row.map(PathBuf::from)).collect()
+}
+
+fn remove_missing_on(conn: &Connection, seen: &HashSet<PathBuf>) -> Result<usize, rusqlite::Error> {
+    let mut removed = 0;
+    for path in all_paths_on(conn)? {
+        if !seen.contains(&path) {
+            let key = path.to_string_lossy();
+            let key = key.as_ref();
+            removed += conn.execute("DELETE FROM games WHERE path = ?1", params![key])?;
+            conn.execute("DELETE FROM favorites WHERE path = ?1", params![key])?;
+            conn.execute("DELETE FROM play_history WHERE path = ?1", params![key])?;
+        }
+    }
+    Ok(removed)
 }
 
 impl LibraryDb {
@@ -122,53 +169,34 @@ impl LibraryDb {
     }
 
     pub fn upsert(&self, game: &ScannedGame) -> Result<(), rusqlite::Error> {
-        self.conn.execute(
-            "INSERT INTO games (path, title, system, size, modified_ns, checksum, source_dir)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-             ON CONFLICT(path) DO UPDATE SET
-                title = excluded.title,
-                system = excluded.system,
-                size = excluded.size,
-                modified_ns = excluded.modified_ns,
-                checksum = excluded.checksum,
-                source_dir = excluded.source_dir",
-            params![
-                game.path.to_string_lossy(),
-                game.title,
-                game.system,
-                game.size,
-                game.modified_ns,
-                game.checksum,
-                game.source_dir.to_string_lossy(),
-            ],
-        )?;
-        Ok(())
+        upsert_on(&self.conn, game)
     }
 
     /// Removes rows that were not seen during a completed scan. This covers
     /// deleted files and directories removed from the configuration.
     pub fn remove_missing(&self, seen: &HashSet<PathBuf>) -> Result<usize, rusqlite::Error> {
-        let mut removed = 0;
-        for path in self.all_paths()? {
-            if !seen.contains(&path) {
-                let key = path.to_string_lossy();
-                let key = key.as_ref();
-                removed += self
-                    .conn
-                    .execute("DELETE FROM games WHERE path = ?1", params![key])?;
-                self.conn
-                    .execute("DELETE FROM favorites WHERE path = ?1", params![key])?;
-                self.conn
-                    .execute("DELETE FROM play_history WHERE path = ?1", params![key])?;
-            }
-        }
-        Ok(removed)
+        remove_missing_on(&self.conn, seen)
     }
 
-    fn all_paths(&self) -> Result<Vec<PathBuf>, rusqlite::Error> {
-        let mut statement = self.conn.prepare("SELECT path FROM games")?;
-        let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
-        rows.map(|row| row.map(PathBuf::from)).collect()
+    /// Applies a whole scan in one transaction: either every discovered game
+    /// is indexed (and optionally pruned) or nothing is committed.
+    pub fn apply_scan(
+        &mut self,
+        games: &[(ScannedGame, ScanOutcome)],
+        seen: &HashSet<PathBuf>,
+        prune: bool,
+    ) -> Result<usize, rusqlite::Error> {
+        let transaction = self.conn.transaction()?;
+        for (game, _) in games {
+            upsert_on(&transaction, game)?;
+        }
+        let removed = if prune {
+            remove_missing_on(&transaction, seen)?
+        } else {
+            0
+        };
+        transaction.commit()?;
+        Ok(removed)
     }
 
     pub fn games(&self) -> Result<Vec<GameRecord>, rusqlite::Error> {
@@ -394,7 +422,7 @@ impl LibraryDb {
 #[cfg(test)]
 mod tests {
     use super::LibraryDb;
-    use crate::library::scanner::ScannedGame;
+    use crate::library::scanner::{ScanOutcome, ScannedGame};
     use std::collections::HashSet;
 
     fn game(name: &str, system: &str, checksum: &str) -> ScannedGame {
@@ -453,6 +481,20 @@ mod tests {
         let seen = [game("a.nes", "NES", "a").path].into_iter().collect();
         assert_eq!(db.remove_missing(&seen).unwrap(), 1);
         assert_eq!(db.games().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn apply_scan_commits_and_prunes_only_when_asked() {
+        let mut db = LibraryDb::open_in_memory().unwrap();
+        let entry = game("a.nes", "NES", "a");
+        let seen = HashSet::from([entry.path.clone()]);
+
+        db.apply_scan(&[(entry, ScanOutcome::Added)], &seen, false)
+            .unwrap();
+        assert_eq!(db.games().unwrap().len(), 1);
+
+        db.apply_scan(&[], &HashSet::new(), true).unwrap();
+        assert!(db.games().unwrap().is_empty());
     }
 
     #[test]

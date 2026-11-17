@@ -8,7 +8,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Config {
     /// Game directories to scan. Absolute paths only; never written to by the scanner.
     #[serde(default)]
@@ -25,6 +25,31 @@ pub struct Config {
     /// Optional per-controller action remapping profiles.
     #[serde(default)]
     pub controller_profiles: Vec<crate::input::profiles::ControllerProfile>,
+    #[serde(default = "default_true")]
+    pub auto_scan: bool,
+    #[serde(default = "default_true")]
+    pub vibration: bool,
+    #[serde(default)]
+    pub reduced_motion: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            game_dirs: Vec::new(),
+            bios_dir: None,
+            emulator_settings: BTreeMap::new(),
+            emulator_executables: BTreeMap::new(),
+            controller_profiles: Vec::new(),
+            auto_scan: true,
+            vibration: true,
+            reduced_motion: false,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -141,11 +166,22 @@ mod tests {
     }
 
     #[test]
+    fn preference_defaults_match_the_interface() {
+        let config = Config::default();
+        assert!(config.auto_scan);
+        assert!(config.vibration);
+        assert!(!config.reduced_motion);
+    }
+
+    #[test]
     fn save_and_load_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("nested/config.json");
         let mut config = Config::default();
         assert!(config.add_dir(PathBuf::from("/home/user/ROMs")).unwrap());
+        config.auto_scan = false;
+        config.vibration = false;
+        config.reduced_motion = true;
 
         config.save(&path).unwrap();
         assert_eq!(Config::load(&path).unwrap(), config);

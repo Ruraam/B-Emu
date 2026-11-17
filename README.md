@@ -29,9 +29,12 @@ capability-driven settings, and supervised launching built from `OsString`
 argument arrays (never shell command strings). The registry covers over a
 hundred emulators and accepts per-emulator executable overrides. Phase 4 adds local
 metadata with provenance, a sidecar artwork cache and BIOS/firmware validation.
+Phase 5 persists preferences, applies scans transactionally and validates launch
+paths before starting an emulator.
 
 CI validates formatting, the Wayland-only dependency graph, the Linux build,
 unit tests, and a headless Weston startup smoke test. See
+[docs/PHASE-5.md](docs/PHASE-5.md) for hardening,
 [docs/PHASE-4.md](docs/PHASE-4.md) for metadata and firmware,
 [docs/PHASE-3.md](docs/PHASE-3.md) for the emulator contract,
 [docs/PHASE-2.md](docs/PHASE-2.md) for the library design,

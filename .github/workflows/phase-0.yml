@@ -54,6 +54,9 @@ jobs:
       - name: Audit backend features (X11 must be absent)
         run: bash scripts/check-wayland-features.sh
 
+      - name: Audit launch safety (no shell command strings)
+        run: bash scripts/check-launch-safety.sh
+
       - name: Compile all targets
         run: cargo check --all-targets
 

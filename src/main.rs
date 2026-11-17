@@ -87,23 +87,37 @@ fn set_motion_duration(window: &MainWindow, reduced: bool) {
     window.invoke_set_motion_duration(nanos);
 }
 
-fn toggle_setting(window: &MainWindow, index: i32, vibration: &Arc<AtomicBool>) {
-    match index {
-        0 => {
-            let value = window.get_setting_auto_scan();
-            window.set_setting_auto_scan(!value);
+fn toggle_setting(
+    window: &MainWindow,
+    index: i32,
+    vibration: &Arc<AtomicBool>,
+    config_path: &Path,
+) {
+    let result = (|| -> Result<(), Box<dyn std::error::Error>> {
+        let mut config = Config::load(config_path)?;
+        match index {
+            0 => {
+                config.auto_scan = !window.get_setting_auto_scan();
+                window.set_setting_auto_scan(config.auto_scan);
+            }
+            1 => {
+                config.vibration = !window.get_setting_vibration();
+                window.set_setting_vibration(config.vibration);
+                vibration.store(config.vibration, Ordering::Relaxed);
+            }
+            2 => {
+                config.reduced_motion = !window.get_setting_reduced_motion();
+                window.set_setting_reduced_motion(config.reduced_motion);
+                set_motion_duration(window, config.reduced_motion);
+            }
+            _ => return Ok(()),
         }
-        1 => {
-            let value = window.get_setting_vibration();
-            window.set_setting_vibration(!value);
-            vibration.store(!value, Ordering::Relaxed);
-        }
-        2 => {
-            let value = window.get_setting_reduced_motion();
-            window.set_setting_reduced_motion(!value);
-            set_motion_duration(window, !value);
-        }
-        _ => {}
+        config.save(config_path)?;
+        Ok(())
+    })();
+
+    if let Err(error) = result {
+        eprintln!("[b-emu] could not save preference: {error}");
     }
 }
 
@@ -196,7 +210,7 @@ fn apply_nav_action(
                 refresh_capabilities(window, config_path, installations);
                 refresh_selected_bios(window, installations, bios_store);
             }
-            4 => activate_settings_item(window, next.focused_item, vibration),
+            4 => activate_settings_item(window, next.focused_item, vibration, config_path),
             _ => {}
         }
     }
@@ -374,13 +388,35 @@ fn launch_game(
         return;
     };
     let install = install.clone();
-    let enabled = match Config::load(config_path) {
-        Ok(config) => config.enabled_capabilities(&install.id),
+    let config = match Config::load(config_path) {
+        Ok(config) => config,
         Err(error) => {
-            eprintln!("[b-emu] could not load emulator settings: {error}");
-            Default::default()
+            eprintln!("[b-emu] could not load configuration: {error}");
+            window.set_launch_status("Configuration illisible".into());
+            return;
         }
     };
+
+    // Launch only regular files located inside a configured game directory.
+    // Canonicalizing also resolves symlinks that would point outside the roots.
+    let rom = match PathBuf::from(path.as_str()).canonicalize() {
+        Ok(path) if path.is_file() => path,
+        _ => {
+            window.set_launch_status("Fichier de jeu introuvable".into());
+            return;
+        }
+    };
+    let inside_root = config.game_dirs.iter().any(|root| {
+        root.canonicalize()
+            .map(|root| rom.starts_with(root))
+            .unwrap_or(false)
+    });
+    if !inside_root {
+        window.set_launch_status("Jeu hors des dossiers configurés".into());
+        return;
+    }
+
+    let enabled = config.enabled_capabilities(&install.id);
 
     let weak = window.as_weak();
     let refresh_db = db_path.to_path_buf();
@@ -397,7 +433,7 @@ fn launch_game(
     match launch_worker::LaunchWorker::start(
         window.as_weak(),
         install,
-        PathBuf::from(path.as_str()),
+        rom,
         enabled,
         db_path.to_path_buf(),
         on_finished,
@@ -709,10 +745,15 @@ fn start_scan(
     }
 }
 
-fn activate_settings_item(window: &MainWindow, index: i32, vibration: &Arc<AtomicBool>) {
+fn activate_settings_item(
+    window: &MainWindow,
+    index: i32,
+    vibration: &Arc<AtomicBool>,
+    config_path: &Path,
+) {
     let dirs = window.get_game_dirs().row_count() as i32;
     if index < 3 {
-        toggle_setting(window, index, vibration);
+        toggle_setting(window, index, vibration, config_path);
     } else if index < 3 + dirs {
         window.invoke_remove_focused_dir();
     } else if index == 3 + dirs {
@@ -758,7 +799,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("[b-emu] could not load library index: {error}");
     }
 
-    let vibration = Arc::new(AtomicBool::new(true));
+    let preferences = Config::load(&config_path).unwrap_or_default();
+    window.set_setting_auto_scan(preferences.auto_scan);
+    window.set_setting_vibration(preferences.vibration);
+    window.set_setting_reduced_motion(preferences.reduced_motion);
+    set_motion_duration(&window, preferences.reduced_motion);
+
+    let vibration = Arc::new(AtomicBool::new(preferences.vibration));
     let scan_slot: Rc<RefCell<Option<scan_worker::ScanWorker>>> = Rc::new(RefCell::new(None));
     let launch_slots: Rc<RefCell<Vec<launch_worker::LaunchWorker>>> =
         Rc::new(RefCell::new(Vec::new()));
@@ -785,9 +832,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let weak = window.as_weak();
     let vibration_for_setting = Arc::clone(&vibration);
+    let config_for_setting = config_path.clone();
     window.on_toggle_setting(move |index| {
         if let Some(window) = weak.upgrade() {
-            toggle_setting(&window, index, &vibration_for_setting);
+            toggle_setting(&window, index, &vibration_for_setting, &config_for_setting);
         }
     });
 

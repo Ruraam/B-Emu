@@ -157,6 +157,7 @@ impl Library {
         let known = self.db.known_files()?;
         let mut report = ScanReport::default();
         let mut seen = HashSet::new();
+        let mut discovered = Vec::new();
 
         for root in roots {
             if !root.is_dir() {
@@ -167,14 +168,14 @@ impl Library {
             report.errors += result.errors;
             report.cancelled |= result.cancelled;
 
-            for (game, outcome) in &result.games {
+            for (game, outcome) in result.games {
                 seen.insert(game.path.clone());
                 match outcome {
                     ScanOutcome::Added => report.added += 1,
                     ScanOutcome::Updated => report.updated += 1,
                     ScanOutcome::Unchanged => report.unchanged += 1,
                 }
-                self.db.upsert(game)?;
+                discovered.push((game, outcome));
             }
 
             if report.cancelled {
@@ -182,11 +183,9 @@ impl Library {
             }
         }
 
-        // Only a completed scan may prune the index.
-        if !report.cancelled {
-            report.removed = self.db.remove_missing(&seen)? as usize;
-        }
-
+        // One transaction: a crash cannot leave a half-written index. Only a
+        // completed scan is allowed to prune rows.
+        report.removed = self.db.apply_scan(&discovered, &seen, !report.cancelled)?;
         Ok(report)
     }
 }
