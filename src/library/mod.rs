@@ -124,12 +124,16 @@ impl Library {
         let artwork = self.db.artwork_map()?;
 
         for game in self.games()? {
-            if !metadata.contains_key(&path_string(&game.path)) {
-                self.db
-                    .upsert_metadata(&crate::metadata::from_filename(&game))?;
-                enriched += 1;
+            let Some(key) = path_string(&game.path) else {
+                continue;
+            };
+            if !metadata.contains_key(&key) {
+                if let Some(found) = crate::metadata::from_filename(&game) {
+                    self.db.upsert_metadata(&found)?;
+                    enriched += 1;
+                }
             }
-            if !artwork.contains_key(&path_string(&game.path)) {
+            if !artwork.contains_key(&key) {
                 if let Some(found) = crate::metadata::sidecar_artwork(&game, cache_dir) {
                     self.db.upsert_artwork(&found)?;
                 }
@@ -198,8 +202,8 @@ impl Library {
     }
 }
 
-fn path_string(path: &Path) -> String {
-    path.to_string_lossy().into_owned()
+fn path_string(path: &Path) -> Option<String> {
+    path.to_str().map(str::to_owned)
 }
 
 #[cfg(test)]
