@@ -24,11 +24,13 @@ Phase 0 validated the Wayland-only build and startup policy. Phase 1 delivered
 five data-driven screens (Home, Systems, Library, Emulators, Settings) with a
 unified keyboard, mouse and gamepad focus model. Phase 2 adds configurable game
 directories, a read-only SHA-256 scanner and a local SQLite index that backs the
-Home, Systems and Library screens. Emulator detection remains planned for
-Phase 3.
+Home, Systems and Library screens. Phase 3 adds emulator discovery on `PATH`,
+capability-driven settings, and supervised launching built from `OsString`
+argument arrays (never shell command strings).
 
 CI validates formatting, the Wayland-only dependency graph, the Linux build,
 unit tests, and a headless Weston startup smoke test. See
+[docs/PHASE-3.md](docs/PHASE-3.md) for the emulator contract,
 [docs/PHASE-2.md](docs/PHASE-2.md) for the library design,
 [docs/GAMEPAD.md](docs/GAMEPAD.md) for the input model, and
 [docs/PHASE-0.md](docs/PHASE-0.md) for the renderer and Wayland policy.

@@ -154,7 +154,7 @@ Every emulator adapter should report:
 
 Settings are capability-driven. An adapter must not expose a setting unless it can verify that the installed emulator version supports it. Unknown settings remain hidden rather than guessed.
 
-The first adapters should be selected based on availability and testability on Debian-based Linux, then expanded.
+The first adapters should be selected based on availability and testability on Debian-based Linux, then expanded. The Phase 3 implementation is documented in [PHASE-3.md](PHASE-3.md).
 
 ## 8. Controller and mouse input
 

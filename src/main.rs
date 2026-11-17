@@ -7,6 +7,7 @@ use std::{
 
 use b_emu::{
     config::Config,
+    emulators::{self, EmulatorInstallation},
     input::{
         GamepadAction,
         navigation::{FocusZone, Navigation, apply_action},
@@ -18,6 +19,7 @@ use b_emu::{
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 mod gamepad_worker;
+mod launch_worker;
 mod scan_worker;
 mod shell;
 
@@ -66,7 +68,9 @@ fn item_count(window: &MainWindow) -> i32 {
         0 => 1 + window.get_played_games().row_count() as i32, // hero card + played games
         1 => window.get_systems().row_count() as i32,
         2 => 2 + window.get_library_games().row_count() as i32, // two filter pills + games
-        3 => window.get_emulators().row_count() as i32,
+        3 => {
+            window.get_emulators().row_count() as i32 + window.get_capabilities().row_count() as i32
+        }
         4 => 5 + window.get_game_dirs().row_count() as i32, // 3 toggles + dirs + add + scan
         _ => 0,
     }
@@ -98,7 +102,13 @@ fn toggle_setting(window: &MainWindow, index: i32) {
 }
 
 /// Applies one shared navigation action coming from keyboard or gamepad.
-fn apply_nav_action(window: &MainWindow, db_path: &Path, action: NavAction) {
+fn apply_nav_action(
+    window: &MainWindow,
+    config_path: &Path,
+    db_path: &Path,
+    installations: &[EmulatorInstallation],
+    action: NavAction,
+) {
     let gamepad_action = action_from_nav(action);
     let old_zone = zone_from_ui(window.get_focus_zone());
 
@@ -112,6 +122,17 @@ fn apply_nav_action(window: &MainWindow, db_path: &Path, action: NavAction) {
     };
 
     let mut next = apply_action(state, gamepad_action, item_count(window));
+
+    // Capability settings follow the emulator rows in the Emulators screen.
+    if next.active_page == 3
+        && next.zone == FocusZone::Content
+        && gamepad_action == GamepadAction::Confirm
+        && next.focused_item >= window.get_emulators().row_count() as i32
+    {
+        let index = next.focused_item - window.get_emulators().row_count() as i32;
+        toggle_capability_at(window, config_path, installations, index);
+        return;
+    }
 
     // The library has two filter pills before the game rows.
     if next.active_page == 2 && next.zone == FocusZone::Content {
@@ -160,11 +181,160 @@ fn apply_nav_action(window: &MainWindow, db_path: &Path, action: NavAction) {
         }
     }
 
-    if gamepad_action == GamepadAction::Confirm
-        && next.zone == FocusZone::Content
-        && next.active_page == 4
-    {
-        activate_settings_item(window, next.focused_item);
+    if gamepad_action == GamepadAction::Confirm && next.zone == FocusZone::Content {
+        match next.active_page {
+            3 => {
+                window.set_selected_item(next.focused_item);
+                refresh_capabilities(window, config_path, installations);
+            }
+            4 => activate_settings_item(window, next.focused_item),
+            _ => {}
+        }
+    }
+}
+
+fn refresh_capabilities(
+    window: &MainWindow,
+    config_path: &Path,
+    installations: &[EmulatorInstallation],
+) {
+    let index = window.get_selected_item();
+    let Some(install) = usize::try_from(index)
+        .ok()
+        .and_then(|value| installations.get(value))
+    else {
+        window.set_capabilities(model(Vec::<CapabilityRow>::new()));
+        return;
+    };
+
+    let enabled = match Config::load(config_path) {
+        Ok(config) => config.enabled_capabilities(&install.id),
+        Err(error) => {
+            eprintln!("[b-emu] could not load emulator settings: {error}");
+            Default::default()
+        }
+    };
+
+    let rows: Vec<CapabilityRow> = install
+        .capabilities
+        .iter()
+        .map(|capability| CapabilityRow {
+            key: SharedString::from(capability.key),
+            label: SharedString::from(capability.label),
+            flag: SharedString::from(capability.flag),
+            enabled: enabled.contains(capability.key),
+        })
+        .collect();
+    window.set_capabilities(model(rows));
+}
+
+fn refresh_emulators(
+    window: &MainWindow,
+    config_path: &Path,
+    installations: &[EmulatorInstallation],
+) {
+    let rows: Vec<EmulatorRow> = installations
+        .iter()
+        .map(|install| EmulatorRow {
+            id: SharedString::from(install.id.as_str()),
+            name: SharedString::from(install.name.as_str()),
+            version: SharedString::from(install.version.as_deref().unwrap_or("inconnue")),
+            status: SharedString::from(if install.version.is_some() {
+                "Détecté"
+            } else {
+                "Version ?"
+            }),
+            systems: SharedString::from(install.systems.join(" · ").as_str()),
+            bios: SharedString::from(
+                install
+                    .adapter
+                    .bios
+                    .iter()
+                    .map(|requirement| requirement.name)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+                    .as_str(),
+            ),
+            ready: true,
+        })
+        .collect();
+    window.set_emulators(model(rows));
+    refresh_capabilities(window, config_path, installations);
+}
+
+fn toggle_capability_at(
+    window: &MainWindow,
+    config_path: &Path,
+    installations: &[EmulatorInstallation],
+    index: i32,
+) {
+    let Some(install) = installations.get(window.get_selected_item().max(0) as usize) else {
+        return;
+    };
+    let Some(capability) = install.capabilities.get(index.max(0) as usize) else {
+        return;
+    };
+
+    let result = (|| -> Result<(), Box<dyn std::error::Error>> {
+        let mut config = Config::load(config_path)?;
+        config.toggle_capability(&install.id, capability.key);
+        config.save(config_path)?;
+        Ok(())
+    })();
+    if let Err(error) = result {
+        eprintln!("[b-emu] could not save emulator setting: {error}");
+        return;
+    }
+    refresh_capabilities(window, config_path, installations);
+}
+
+fn launch_game(
+    window: &MainWindow,
+    config_path: &Path,
+    db_path: &Path,
+    installations: &[EmulatorInstallation],
+    slots: &Rc<RefCell<Vec<launch_worker::LaunchWorker>>>,
+    path: SharedString,
+    system: SharedString,
+) {
+    let Some(install) = emulators::for_system(&system, installations) else {
+        window.set_launch_status("Aucun émulateur pour ce système".into());
+        return;
+    };
+    let install = install.clone();
+    let enabled = match Config::load(config_path) {
+        Ok(config) => config.enabled_capabilities(&install.id),
+        Err(error) => {
+            eprintln!("[b-emu] could not load emulator settings: {error}");
+            Default::default()
+        }
+    };
+
+    let weak = window.as_weak();
+    let refresh_db = db_path.to_path_buf();
+    let on_finished = Box::new(move || {
+        let weak = weak.clone();
+        let refresh_db = refresh_db.clone();
+        let _ = weak.upgrade_in_event_loop(move |ui| {
+            if let Err(error) = refresh_library(&ui, &refresh_db) {
+                eprintln!("[b-emu] could not refresh play history: {error}");
+            }
+        });
+    });
+
+    match launch_worker::LaunchWorker::start(
+        window.as_weak(),
+        install,
+        PathBuf::from(path.as_str()),
+        enabled,
+        db_path.to_path_buf(),
+        on_finished,
+    ) {
+        Ok(worker) => slots.borrow_mut().push(worker),
+        Err(error) => {
+            eprintln!("[b-emu] could not start launch worker: {error}");
+            window.set_launch_status("Échec du lancement".into());
+        }
     }
 }
 
@@ -429,12 +599,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let config_path = paths.config_dir.join("config.json");
     let db_path = paths.data_dir.join("library.sqlite3");
 
+    let installations: Rc<RefCell<Vec<EmulatorInstallation>>> =
+        Rc::new(RefCell::new(emulators::discovery::discover()));
+
     let window = MainWindow::new()?;
     window.set_pages(model(shell::pages()));
-    window.set_emulators(model(shell::emulators()));
-    window.set_emulators_ready_count(
-        shell::emulators().iter().filter(|row| row.ready).count() as i32,
-    );
+    refresh_emulators(&window, &config_path, &installations.borrow());
 
     if let Err(error) = refresh_dirs(&window, &config_path) {
         eprintln!("[b-emu] could not load game directories: {error}");
@@ -444,12 +614,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let scan_slot: Rc<RefCell<Option<scan_worker::ScanWorker>>> = Rc::new(RefCell::new(None));
+    let launch_slots: Rc<RefCell<Vec<launch_worker::LaunchWorker>>> =
+        Rc::new(RefCell::new(Vec::new()));
 
     let weak = window.as_weak();
+    let config = config_path.clone();
     let db = db_path.clone();
+    let installs = Rc::clone(&installations);
     window.on_request_action(move |action| {
         if let Some(window) = weak.upgrade() {
-            apply_nav_action(&window, &db, action);
+            apply_nav_action(&window, &config, &db, &installs.borrow(), action);
         }
     });
 
@@ -539,6 +713,61 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Err(error) => eprintln!("[b-emu] could not record play: {error}"),
             }
+        }
+    });
+
+    let weak = window.as_weak();
+    let config = config_path.clone();
+    let installs = Rc::clone(&installations);
+    window.on_select_emulator(move |index| {
+        if let Some(window) = weak.upgrade() {
+            window.set_selected_item(index);
+            refresh_capabilities(&window, &config, &installs.borrow());
+        }
+    });
+
+    let weak = window.as_weak();
+    let config = config_path.clone();
+    let save_path = config_path.clone();
+    let installs = Rc::clone(&installations);
+    window.on_toggle_capability(move |key: SharedString| {
+        if let Some(window) = weak.upgrade() {
+            let installs = installs.borrow();
+            let Some(install) = installs.get(window.get_selected_item().max(0) as usize) else {
+                return;
+            };
+            let Some(capability) = install.capabilities.iter().find(|cap| key == cap.key) else {
+                return;
+            };
+            let result = (|| -> Result<(), Box<dyn std::error::Error>> {
+                let mut config = Config::load(&config)?;
+                config.toggle_capability(&install.id, capability.key);
+                config.save(&save_path)?;
+                Ok(())
+            })();
+            if let Err(error) = result {
+                eprintln!("[b-emu] could not save emulator setting: {error}");
+            }
+            refresh_capabilities(&window, &config, &installs);
+        }
+    });
+
+    let weak = window.as_weak();
+    let config = config_path.clone();
+    let db = db_path.clone();
+    let installs = Rc::clone(&installations);
+    let slots = Rc::clone(&launch_slots);
+    window.on_launch_game(move |path: SharedString, system: SharedString| {
+        if let Some(window) = weak.upgrade() {
+            launch_game(
+                &window,
+                &config,
+                &db,
+                &installs.borrow(),
+                &slots,
+                path,
+                system,
+            );
         }
     });
 

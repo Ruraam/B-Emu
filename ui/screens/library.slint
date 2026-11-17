@@ -12,10 +12,12 @@ export component LibraryScreen inherits VerticalLayout {
     in property<int> selected-item: -1;
     in property<bool> show-favorites-only: false;
     in-out property<string> search-text: "";
+    in-out property<string> launch-status: "";
     callback search-changed(string);
     callback set-favorites-filter(bool);
     callback toggle-favorite(string);
     callback mark-played(string);
+    callback launch-game(string, string);
 
     spacing: 16px;
 
@@ -200,6 +202,25 @@ export component LibraryScreen inherits VerticalLayout {
                         }
                     }
                 }
+
+                Rectangle {
+                    height: 34px;
+                    border-radius: 8px;
+                    background: Theme.panel-raised;
+                    border-width: 1px;
+                    border-color: Theme.border-highlight;
+                    visible: root.selected-item >= 0 && root.selected-item < root.games.length;
+                    Text { text: "▶ LANCER AVEC UN ÉMULATEUR"; color: Theme.accent-cyan; font-size: 11px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                    TouchArea {
+                        clicked => {
+                            if (root.selected-item >= 0 && root.selected-item < root.games.length) {
+                                root.launch-game(root.games[root.selected-item].path, root.games[root.selected-item].system);
+                            }
+                        }
+                    }
+                }
+
+                Text { text: root.launch-status; color: Theme.text-muted; font-size: 10px; wrap: word-wrap; }
 
                 StatusPill { label: "A · FAVORI  ·  X · JOUÉ  ·  B RETOUR"; }
             }

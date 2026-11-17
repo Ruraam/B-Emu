@@ -47,10 +47,19 @@ export struct SystemStat {
     accent: color,
 }
 
+export struct CapabilityRow {
+    key: string,
+    label: string,
+    flag: string,
+    enabled: bool,
+}
+
 export struct EmulatorRow {
+    id: string,
     name: string,
     version: string,
     status: string,
     systems: string,
+    bios: string,
     ready: bool,
 }

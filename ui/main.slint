@@ -1,6 +1,6 @@
 import { Theme, Motion } from "theme.slint";
 import { SidebarItem } from "components/sidebar-item.slint";
-import { NavAction, IndexedGame, SystemStat, EmulatorRow } from "models.slint";
+import { NavAction, IndexedGame, SystemStat, EmulatorRow, CapabilityRow } from "models.slint";
 import { HomeScreen } from "screens/home.slint";
 import { SystemsScreen } from "screens/systems.slint";
 import { LibraryScreen } from "screens/library.slint";
@@ -29,6 +29,7 @@ export component MainWindow inherits Window {
     in property<[IndexedGame]> library-games;
     in property<[SystemStat]> systems;
     in property<[EmulatorRow]> emulators;
+    in property<[CapabilityRow]> capabilities;
     in-out property<string> search-text: "";
     in-out property<int> games-count: 0;
     in-out property<int> systems-count: 0;
@@ -42,6 +43,7 @@ export component MainWindow inherits Window {
     in-out property<string> scan-status: "Prêt";
     in-out property<float> scan-progress: 0;
     in-out property<bool> show-favorites-only: false;
+    in-out property<string> launch-status: "";
 
     callback request-action(NavAction);
     callback search-changed(string);
@@ -56,6 +58,9 @@ export component MainWindow inherits Window {
     callback set-favorites-filter(bool);
     callback toggle-favorite(string);
     callback mark-played(string);
+    callback select-emulator(int);
+    callback toggle-capability(string);
+    callback launch-game(string, string);
 
     remove-focused-dir() => { root.remove-dir(root.focused-item - 3); }
 
@@ -242,16 +247,22 @@ export component MainWindow inherits Window {
                         selected-item: root.selected-item;
                         show-favorites-only: root.show-favorites-only;
                         search-text: root.search-text;
+                        launch-status: root.launch-status;
                         search-changed(text) => { root.search-changed(text); }
                         set-favorites-filter(value) => { root.set-favorites-filter(value); }
                         toggle-favorite(path) => { root.toggle-favorite(path); }
                         mark-played(path) => { root.mark-played(path); }
+                        launch-game(path, system) => { root.launch-game(path, system); }
                     }
 
                     if root.active-page == 3: EmulatorsScreen {
                         emulators: root.emulators;
+                        capabilities: root.capabilities;
+                        selected-item: root.selected-item;
                         focused-item: root.focused-item;
                         content-focused: root.focus-zone == 1;
+                        select-emulator(index) => { root.select-emulator(index); }
+                        toggle-capability(key) => { root.toggle-capability(key); }
                     }
 
                     if root.active-page == 4: SettingsScreen {
