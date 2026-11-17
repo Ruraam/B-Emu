@@ -66,7 +66,9 @@ fn modified_ns(metadata: &fs::Metadata) -> i64 {
         .unwrap_or(0)
 }
 
-fn checksum(path: &Path) -> io::Result<String> {
+/// SHA-256 of a file streamed in chunks. Used by the scanner and the BIOS
+/// inventory; files are only ever opened for reading.
+pub fn hash_file(path: &Path) -> io::Result<String> {
     let mut file = File::open(path)?;
     let mut hasher = Sha256::new();
     let mut buffer = [0u8; 64 * 1024];
@@ -146,14 +148,14 @@ pub fn scan_root(
             {
                 (known.checksum.clone(), ScanOutcome::Unchanged)
             }
-            Some(_) => match checksum(path) {
+            Some(_) => match hash_file(path) {
                 Ok(value) => (value, ScanOutcome::Updated),
                 Err(_) => {
                     result.errors += 1;
                     continue;
                 }
             },
-            None => match checksum(path) {
+            None => match hash_file(path) {
                 Ok(value) => (value, ScanOutcome::Added),
                 Err(_) => {
                     result.errors += 1;

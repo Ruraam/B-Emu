@@ -7,7 +7,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OptionalExtension, params};
 
 use super::scanner::{KnownFile, ScannedGame};
 
@@ -82,6 +82,21 @@ impl LibraryDb {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 path TEXT NOT NULL,
                 played_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS metadata (
+                path TEXT PRIMARY KEY,
+                title TEXT,
+                description TEXT,
+                year INTEGER,
+                region TEXT,
+                provider TEXT NOT NULL,
+                fetched_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS artwork (
+                path TEXT PRIMARY KEY,
+                cache_path TEXT NOT NULL,
+                source TEXT NOT NULL,
+                created_at INTEGER NOT NULL
             );
             CREATE INDEX IF NOT EXISTS games_system ON games(system);
             CREATE INDEX IF NOT EXISTS games_checksum ON games(checksum);
@@ -286,6 +301,111 @@ impl LibraryDb {
                 name: row.get(0)?,
                 game_count: row.get(1)?,
             })
+        })?;
+        rows.collect()
+    }
+
+    pub fn upsert_metadata(
+        &self,
+        metadata: &crate::metadata::Metadata,
+    ) -> Result<(), rusqlite::Error> {
+        self.conn.execute(
+            "INSERT INTO metadata (path, title, description, year, region, provider, fetched_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(path) DO UPDATE SET
+                title = excluded.title, description = excluded.description,
+                year = excluded.year, region = excluded.region,
+                provider = excluded.provider, fetched_at = excluded.fetched_at",
+            params![
+                metadata.path,
+                metadata.title,
+                metadata.description,
+                metadata.year,
+                metadata.region,
+                metadata.provider,
+                now_ns(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn metadata_map(
+        &self,
+    ) -> Result<HashMap<String, crate::metadata::Metadata>, rusqlite::Error> {
+        let mut statement = self
+            .conn
+            .prepare("SELECT path, title, description, year, region, provider FROM metadata")?;
+        let rows = statement.query_map([], |row| {
+            let path: String = row.get(0)?;
+            Ok((
+                path.clone(),
+                crate::metadata::Metadata {
+                    path,
+                    title: row.get(1)?,
+                    description: row.get(2)?,
+                    year: row.get(3)?,
+                    region: row.get(4)?,
+                    provider: row.get(5)?,
+                },
+            ))
+        })?;
+        rows.collect()
+    }
+
+    pub fn metadata_for(
+        &self,
+        path: &str,
+    ) -> Result<Option<crate::metadata::Metadata>, rusqlite::Error> {
+        self.conn
+            .query_row(
+                "SELECT path, title, description, year, region, provider FROM metadata WHERE path = ?1",
+                params![path],
+                |row| Ok(crate::metadata::Metadata {
+                    path: row.get(0)?,
+                    title: row.get(1)?,
+                    description: row.get(2)?,
+                    year: row.get(3)?,
+                    region: row.get(4)?,
+                    provider: row.get(5)?,
+                }),
+            )
+            .optional()
+    }
+
+    pub fn upsert_artwork(
+        &self,
+        artwork: &crate::metadata::Artwork,
+    ) -> Result<(), rusqlite::Error> {
+        self.conn.execute(
+            "INSERT INTO artwork (path, cache_path, source, created_at) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(path) DO UPDATE SET
+                cache_path = excluded.cache_path, source = excluded.source",
+            params![
+                artwork.path,
+                artwork.cache_path.to_string_lossy(),
+                artwork.source,
+                now_ns(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn artwork_map(
+        &self,
+    ) -> Result<HashMap<String, crate::metadata::Artwork>, rusqlite::Error> {
+        let mut statement = self
+            .conn
+            .prepare("SELECT path, cache_path, source FROM artwork")?;
+        let rows = statement.query_map([], |row| {
+            let path: String = row.get(0)?;
+            Ok((
+                path.clone(),
+                crate::metadata::Artwork {
+                    path,
+                    cache_path: PathBuf::from(row.get::<_, String>(1)?),
+                    source: row.get(2)?,
+                },
+            ))
         })?;
         rows.collect()
     }

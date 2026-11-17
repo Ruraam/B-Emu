@@ -13,6 +13,9 @@ pub struct Config {
     /// Game directories to scan. Absolute paths only; never written to by the scanner.
     #[serde(default)]
     pub game_dirs: Vec<PathBuf>,
+    /// Optional directory containing BIOS/firmware files.
+    #[serde(default)]
+    pub bios_dir: Option<PathBuf>,
     /// Capability settings keyed by emulator id, then capability key.
     #[serde(default)]
     pub emulator_settings: BTreeMap<String, BTreeMap<String, bool>>,

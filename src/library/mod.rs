@@ -5,7 +5,7 @@ mod scanner;
 mod systems;
 
 pub use db::{Counts, GameRecord, SystemSummary};
-pub use scanner::{ScanOutcome, ScanProgress};
+pub use scanner::{ScanOutcome, ScanProgress, hash_file};
 
 use std::{
     collections::HashSet,
@@ -105,6 +105,39 @@ impl Library {
         Ok(self.db.recently_played(limit)?)
     }
 
+    pub fn metadata_map(
+        &self,
+    ) -> Result<std::collections::HashMap<String, crate::metadata::Metadata>, LibraryError> {
+        Ok(self.db.metadata_map()?)
+    }
+
+    pub fn artwork_map(
+        &self,
+    ) -> Result<std::collections::HashMap<String, crate::metadata::Artwork>, LibraryError> {
+        Ok(self.db.artwork_map()?)
+    }
+
+    /// Fills missing metadata from local, provenance-tracked providers.
+    pub fn enrich_all(&self, cache_dir: &Path) -> Result<usize, LibraryError> {
+        let mut enriched = 0;
+        let metadata = self.db.metadata_map()?;
+        let artwork = self.db.artwork_map()?;
+
+        for game in self.games()? {
+            if !metadata.contains_key(&path_string(&game.path)) {
+                self.db
+                    .upsert_metadata(&crate::metadata::from_filename(&game))?;
+                enriched += 1;
+            }
+            if !artwork.contains_key(&path_string(&game.path)) {
+                if let Some(found) = crate::metadata::sidecar_artwork(&game, cache_dir) {
+                    self.db.upsert_artwork(&found)?;
+                }
+            }
+        }
+        Ok(enriched)
+    }
+
     pub fn counts(&self) -> Result<Counts, LibraryError> {
         Ok(self.db.counts()?)
     }
@@ -156,6 +189,10 @@ impl Library {
 
         Ok(report)
     }
+}
+
+fn path_string(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
 }
 
 #[cfg(test)]
