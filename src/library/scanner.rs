@@ -210,6 +210,48 @@ mod tests {
     use super::{ScanOutcome, scan_root};
     use std::{collections::HashMap, fs, sync::atomic::AtomicBool};
 
+    #[cfg(unix)]
+    #[test]
+    fn rejects_non_utf8_game_paths_without_lossy_indexing() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let name = std::ffi::OsString::from_vec(b"rom-\\xff.nes".to_vec());
+        fs::write(dir.path().join(name), b"rom").unwrap();
+
+        let result = scan_root(
+            dir.path(),
+            &HashMap::new(),
+            &AtomicBool::new(false),
+            &mut |_| {},
+        );
+
+        assert_eq!(result.errors, 1);
+        assert!(result.games.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_non_utf8_scan_roots() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir
+            .path()
+            .join(std::ffi::OsString::from_vec(b"roms-\\xff".to_vec()));
+        fs::create_dir(&root).unwrap();
+
+        let result = scan_root(
+            &root,
+            &HashMap::new(),
+            &AtomicBool::new(false),
+            &mut |_| {},
+        );
+
+        assert_eq!(result.errors, 1);
+        assert!(result.games.is_empty());
+    }
+
     #[test]
     fn discovers_supported_files_only() {
         let dir = tempfile::tempdir().unwrap();
