@@ -1,0 +1,32 @@
+// Console identification artwork, bundled with the application.
+// Unknown systems simply render no logo rather than a guessed one.
+export component ConsoleLogo inherits Image {
+    in property<string> system: "";
+
+    image-fit: contain;
+    source: root.system == "NES" ? @image-url("../../assets/logos/nes.png")
+        : root.system == "Famicom" ? @image-url("../../assets/logos/famicom.png")
+        : root.system == "Super Nintendo" ? @image-url("../../assets/logos/snes.png")
+        : root.system == "Mega Drive" ? @image-url("../../assets/logos/megadrive.png")
+        : root.system == "Nintendo 64" ? @image-url("../../assets/logos/n64.png")
+        : root.system == "Game Boy" ? @image-url("../../assets/logos/gb.png")
+        : root.system == "Game Boy Advance" ? @image-url("../../assets/logos/gba.png")
+        : root.system == "PlayStation" ? @image-url("../../assets/logos/playstation.png")
+        : root.system == "PlayStation 2" ? @image-url("../../assets/logos/playstation2.png")
+        : root.system == "PSP" ? @image-url("../../assets/logos/psp.png")
+        : root.system == "Saturn" ? @image-url("../../assets/logos/saturn.png")
+        : root.system == "Dreamcast" ? @image-url("../../assets/logos/dreamcast.png")
+        : root.system == "GameCube" ? @image-url("../../assets/logos/gamecube.png")
+        : root.system == "Wii" ? @image-url("../../assets/logos/wii.png")
+        : root.system == "Nintendo DS" ? @image-url("../../assets/logos/nds.png")
+        : root.system == "Neo Geo" ? @image-url("../../assets/logos/neogeo.png")
+        : root.system == "PC Engine" ? @image-url("../../assets/logos/pcengine.png")
+        : root.system == "MSX" ? @image-url("../../assets/logos/msx.png")
+        : root.system == "Commodore 64" ? @image-url("../../assets/logos/c64.png")
+        : root.system == "ZX Spectrum" ? @image-url("../../assets/logos/zxspectrum.png")
+        : root.system == "Atari 2600" ? @image-url("../../assets/logos/atari2600.png")
+        : root.system == "Atari Lynx" ? @image-url("../../assets/logos/lynx.png")
+        : root.system == "Game Gear" ? @image-url("../../assets/logos/gamegear.png")
+        : root.system == "Virtual Boy" ? @image-url("../../assets/logos/virtualboy.png")
+        : @image-url("../../assets/logos/unknown.png");
+}

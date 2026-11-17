@@ -3,8 +3,10 @@ import { Theme, Motion } from "../theme.slint";
 export component ListRow inherits Rectangle {
     in property<bool> focused: false;
     in property<bool> selected: false;
+    in property<length> row-height: 58px;
+    in property<length> row-padding: 14px;
 
-    height: 58px;
+    height: root.row-height;
     border-radius: 10px;
     background: root.focused ? Theme.sidebar-focus : Theme.panel;
     border-width: root.focused ? 2px : 1px;
@@ -16,9 +18,10 @@ export component ListRow inherits Rectangle {
     }
 
     HorizontalLayout {
-        padding-left: 14px;
-        padding-right: 14px;
-        spacing: 14px;
+        padding-left: root.row-padding;
+        padding-right: root.row-padding;
+        spacing: 10px;
+        alignment: center;
         @children
     }
 

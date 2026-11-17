@@ -71,6 +71,8 @@ export component SettingsScreen inherits VerticalLayout {
                     panel-spacing: 6px;
 
                     ListRow {
+                        row-height: 46px;
+                        row-padding: 10px;
                         focused: root.content-focused && root.focused-item == 0;
                         selected: root.focused-item == 0;
                         activated => { root.pending-remove = -1; root.toggle-setting(0); }
@@ -84,6 +86,8 @@ export component SettingsScreen inherits VerticalLayout {
                     }
 
                     ListRow {
+                        row-height: 46px;
+                        row-padding: 10px;
                         focused: root.content-focused && root.focused-item == 1;
                         selected: root.focused-item == 1;
                         activated => { root.pending-remove = -1; root.toggle-setting(1); }
@@ -97,6 +101,8 @@ export component SettingsScreen inherits VerticalLayout {
                     }
 
                     ListRow {
+                        row-height: 46px;
+                        row-padding: 10px;
                         focused: root.content-focused && root.focused-item == 2;
                         selected: root.focused-item == 2;
                         activated => { root.pending-remove = -1; root.toggle-setting(2); }
@@ -125,6 +131,8 @@ export component SettingsScreen inherits VerticalLayout {
                     }
 
                     for dir[i] in root.game-dirs: ListRow {
+                        row-height: 46px;
+                        row-padding: 10px;
                         focused: root.content-focused && root.focused-item == 3 + i;
                         selected: root.focused-item == 3 + i;
                         activated => {
@@ -166,6 +174,8 @@ export component SettingsScreen inherits VerticalLayout {
                     }
 
                     ListRow {
+                        row-height: 46px;
+                        row-padding: 10px;
                         focused: root.content-focused && root.focused-item == 3 + root.game-dirs.length;
                         selected: root.focused-item == 3 + root.game-dirs.length;
                         activated => { root.pending-remove = -1; root.add-dir(root.new-dir-text); }
@@ -173,6 +183,8 @@ export component SettingsScreen inherits VerticalLayout {
                     }
 
                     ListRow {
+                        row-height: 46px;
+                        row-padding: 10px;
                         focused: root.content-focused && root.focused-item == 4 + root.game-dirs.length;
                         selected: root.focused-item == 4 + root.game-dirs.length;
                         activated => { root.pending-remove = -1; root.scan-now(); }

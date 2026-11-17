@@ -10,9 +10,9 @@ ROMS="$DEMO_DIR/roms"
 rm -rf "$DEMO_DIR"
 mkdir -p "$ROMS" "$DEMO_DIR/config/b-emu" "$DEMO_DIR/data" "$DEMO_DIR/cache"
 
-printf 'demo rom' > "$ROMS/Super Mario World (USA) (1990).sfc"
-printf 'demo rom' > "$ROMS/The Legend of Zelda (USA) (1998).z64"
-printf 'demo rom' > "$ROMS/Sonic the Hedgehog (Europe) (1993).md"
+printf 'demo rom mario' > "$ROMS/Super Mario World (USA) (1990).sfc"
+printf 'demo rom zelda' > "$ROMS/The Legend of Zelda (USA) (1998).z64"
+printf 'demo rom sonic' > "$ROMS/Sonic the Hedgehog (Europe) (1993).md"
 printf 'demo rom' > "$ROMS/notes.txt"
 
 # 1x1 PNG, used as sidecar artwork for the first game.

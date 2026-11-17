@@ -18,6 +18,14 @@ records the source (`sidecar`) and cached path. Missing artwork is reported as
 absent, never generated. The Library detail panel displays cached artwork when
 available.
 
+## Console artwork
+
+Small transparent console logos are bundled under `assets/logos/` and embedded
+into the binary at compile time. They identify platforms in the Systems tiles
+and in Library rows/details. Unknown systems render an empty placeholder rather
+than a guessed logo. These are identification assets only: no ROM, BIOS,
+emulator binary or external runtime is bundled.
+
 ## BIOS / firmware
 
 Declared `BiosRequirement` entries from all adapters are checked against the
