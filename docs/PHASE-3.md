@@ -23,11 +23,17 @@ or shown. Capability values are stored per emulator id under
 ## Discovery
 
 `discovery.rs` searches `PATH` for declared executable aliases and probes their
-version with a bounded two-second timeout. The registry currently covers over
-thirty emulators (RetroArch, Dolphin, PCSX2, PPSSPP, MAME, DuckStation,
-Mednafen, bsnes, Snes9x, Mesen, FCEUX, Nestopia, VisualBoyAdvance, mGBA,
-SameBoy, Gambatte, Yabause, Redream, Flycast, Citra, Yuzu, RPCS3, melonDS,
-DeSmuME, DOSBox, ScummVM, VICE, Hatari, Fuse, openMSX, ares, …).
+version with a bounded two-second timeout. The registry covers over a hundred
+emulators, from the curated core (RetroArch, Dolphin, PCSX2, PPSSPP, MAME,
+DuckStation, Mednafen, …) to a broad set of standalone and port systems
+(Azahar, BigPEmu, Cemu, CENgine, Citron, Demul, Flycast, FSUAE, GSplus,
+Mupen64Plus, OpenBOR, Redream, Ryujinx, ShadPS4, Supermodel, Tsugaru, Vita3K,
+Xenia, Ymir, …).
+
+The registry is self-contained: B-Emu does not depend on, bundle or execute any
+external distribution's components. No capabilities are fabricated for the
+broad set of adapters: they expose no settings until real per-version
+capabilities are verified.
 
 Adding another emulator is one `adapter!` entry in `adapters.rs`: id, display
 name, executable aliases, systems, extensions, version arguments, declared

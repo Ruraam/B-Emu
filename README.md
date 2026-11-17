@@ -26,8 +26,8 @@ unified keyboard, mouse and gamepad focus model. Phase 2 adds configurable game
 directories, a read-only SHA-256 scanner and a local SQLite index that backs the
 Home, Systems and Library screens. Phase 3 adds emulator discovery on `PATH`,
 capability-driven settings, and supervised launching built from `OsString`
-argument arrays (never shell command strings). The registry covers over thirty
-emulators and accepts per-emulator executable overrides. Phase 4 adds local
+argument arrays (never shell command strings). The registry covers over a
+hundred emulators and accepts per-emulator executable overrides. Phase 4 adds local
 metadata with provenance, a sidecar artwork cache and BIOS/firmware validation.
 
 CI validates formatting, the Wayland-only dependency graph, the Linux build,
