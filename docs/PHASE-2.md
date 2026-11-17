@@ -29,8 +29,12 @@ The scanner runs on the `b-emu-scan` thread and is cancellable.
 - New or changed files are hashed with SHA-256 while reading them. Unchanged
   files reuse their stored checksum, so rescans are incremental.
 - Per-file errors are counted and skipped rather than aborting the scan.
-- The index is pruned only after a **completed** scan, so cancelling never
-  deletes rows.
+  Non-UTF-8 roots and game paths are rejected explicitly because the current
+  SQLite schema stores paths as UTF-8 text; no lossy path conversion is used.
+- Stale rows are pruned only for roots that were accessible and scanned without
+  errors. Missing roots, partial scans, descendant errors, and cancellation
+  preserve their existing rows, favorites, and play history. A successful root
+  can still be refreshed when a different configured root fails.
 
 Game directories are opened read-only. All writes go to B-Emu's own XDG data
 directory.
@@ -67,6 +71,7 @@ Rows for games removed from the index are cleaned up automatically.
 
 Unit tests cover config round-trips and validation, extension detection,
 read-only scanning, incremental rescans, cancellation, hidden directory
-skipping, SQLite upserts/removals, duplicate detection, and system grouping.
+skipping, missing and partially inaccessible roots, non-UTF-8 path rejection,
+SQLite upserts/removals, duplicate detection, and system grouping.
 The CI Weston smoke test starts the application with a configured ROM
 directory and verifies that the SQLite index is created.
