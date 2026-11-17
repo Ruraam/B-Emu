@@ -1,3 +1,9 @@
+// Shared motion duration. The Rust shell sets this to zero when the user
+// enables "Réduire les animations".
+export global Motion {
+    in-out property<duration> duration: 180ms;
+}
+
 export global Theme {
     out property<color> background: #020617;
     out property<color> background-raised: #071329;

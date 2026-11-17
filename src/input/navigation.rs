@@ -2,8 +2,9 @@
 
 use super::GamepadAction;
 
-/// Number of pages in the application sidebar (Phase 1 shell).
-pub const PAGE_COUNT: i32 = 5;
+/// Default page count used when no UI state is available (e.g. in unit tests).
+/// The running application passes the real count from its Slint page model.
+pub const DEFAULT_PAGE_COUNT: i32 = 5;
 
 /// Which part of the shell currently owns keyboard/gamepad focus.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,6 +22,7 @@ pub enum FocusZone {
 pub struct Navigation {
     pub focused_page: i32,
     pub active_page: i32,
+    pub page_count: i32,
     pub zone: FocusZone,
     pub focused_item: i32,
     pub selected_item: i32,
@@ -31,6 +33,7 @@ impl Default for Navigation {
         Self {
             focused_page: 0,
             active_page: 0,
+            page_count: DEFAULT_PAGE_COUNT,
             zone: FocusZone::Sidebar,
             focused_item: 0,
             selected_item: -1,
@@ -53,19 +56,19 @@ fn wrap(value: i32, count: i32) -> i32 {
 pub fn apply_action(state: Navigation, action: GamepadAction, item_count: i32) -> Navigation {
     // Normalize page indices once so every transition sees valid values.
     let state = Navigation {
-        focused_page: wrap(state.focused_page, PAGE_COUNT),
-        active_page: wrap(state.active_page, PAGE_COUNT),
+        focused_page: wrap(state.focused_page, state.page_count),
+        active_page: wrap(state.active_page, state.page_count),
         ..state
     };
 
     match state.zone {
         FocusZone::Sidebar => match action {
             GamepadAction::NavigateUp => Navigation {
-                focused_page: wrap(state.focused_page - 1, PAGE_COUNT),
+                focused_page: wrap(state.focused_page - 1, state.page_count),
                 ..state
             },
             GamepadAction::NavigateDown => Navigation {
-                focused_page: wrap(state.focused_page + 1, PAGE_COUNT),
+                focused_page: wrap(state.focused_page + 1, state.page_count),
                 ..state
             },
             GamepadAction::Confirm => Navigation {
@@ -165,6 +168,23 @@ mod tests {
     #[test]
     fn invalid_page_indices_are_normalized() {
         assert_eq!(apply_sidebar_action(-1, 7, GamepadAction::Confirm), (4, 4));
+    }
+
+    #[test]
+    fn page_count_comes_from_the_state() {
+        let state = Navigation {
+            focused_page: 0,
+            page_count: 3,
+            ..Navigation::default()
+        };
+        assert_eq!(
+            apply_action(state, GamepadAction::NavigateUp, 0).focused_page,
+            2
+        );
+        assert_eq!(
+            apply_action(state, GamepadAction::NavigateDown, 0).focused_page,
+            1
+        );
     }
 
     #[test]

@@ -15,6 +15,9 @@ events into the normalized actions in `input::GamepadAction`.
 - If the gamepad subsystem cannot initialize, B-Emu logs a diagnostic and
   continues with keyboard and mouse input.
 - Controller disconnects are logged and do not terminate the application.
+- When several controllers are connected, the first one owns navigation.
+  Actions from other controllers are ignored until it disconnects, so two
+  players cannot fight over the same focus state.
 
 ## Default mapping
 

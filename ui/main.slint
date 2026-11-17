@@ -1,4 +1,4 @@
-import { Theme } from "theme.slint";
+import { Theme, Motion } from "theme.slint";
 import { SidebarItem } from "components/sidebar-item.slint";
 import { NavAction, GameCard, SystemCard, EmulatorRow } from "models.slint";
 import { HomeScreen } from "screens/home.slint";
@@ -22,6 +22,7 @@ export component MainWindow inherits Window {
     in-out property<bool> setting-reduced-motion: false;
 
     // Data models supplied by the Rust shell module.
+    in property<[string]> pages;
     in property<[GameCard]> last-played;
     in property<[GameCard]> recent-games;
     in property<[GameCard]> library-games;
@@ -36,6 +37,9 @@ export component MainWindow inherits Window {
     callback toggle-setting(int);
     callback focus-sidebar();
     callback focus-content();
+    callback set-motion-duration(duration);
+
+    set-motion-duration(value) => { Motion.duration = value; }
 
     forward-focus: navigation-focus;
 
@@ -91,39 +95,11 @@ export component MainWindow inherits Window {
                         letter-spacing: 1.5px;
                     }
 
-                    SidebarItem {
-                        label: "Accueil";
-                        selected: root.active-page == 0;
-                        focused: root.focus-zone == 0 && root.focused-page == 0;
-                        activated => { root.open-page(0); }
-                    }
-
-                    SidebarItem {
-                        label: "Systèmes";
-                        selected: root.active-page == 1;
-                        focused: root.focus-zone == 0 && root.focused-page == 1;
-                        activated => { root.open-page(1); }
-                    }
-
-                    SidebarItem {
-                        label: "Bibliothèque";
-                        selected: root.active-page == 2;
-                        focused: root.focus-zone == 0 && root.focused-page == 2;
-                        activated => { root.open-page(2); }
-                    }
-
-                    SidebarItem {
-                        label: "Émulateurs";
-                        selected: root.active-page == 3;
-                        focused: root.focus-zone == 0 && root.focused-page == 3;
-                        activated => { root.open-page(3); }
-                    }
-
-                    SidebarItem {
-                        label: "Paramètres";
-                        selected: root.active-page == 4;
-                        focused: root.focus-zone == 0 && root.focused-page == 4;
-                        activated => { root.open-page(4); }
+                    for page[i] in root.pages: SidebarItem {
+                        label: page;
+                        selected: root.active-page == i;
+                        focused: root.focus-zone == 0 && root.focused-page == i;
+                        activated => { root.open-page(i); }
                     }
 
                     Rectangle {
@@ -157,16 +133,16 @@ export component MainWindow inherits Window {
                     root.focus-zone = 0;
 
                     if (event.text == Key.DownArrow || event.text == Key.PageDown) {
-                        root.focused-page = root.focused-page == 4 ? 0 : root.focused-page + 1;
+                        root.focused-page = Math.mod(root.focused-page + 1, root.pages.length);
                         accept
                     } else if (event.text == Key.UpArrow || event.text == Key.PageUp) {
-                        root.focused-page = root.focused-page == 0 ? 4 : root.focused-page - 1;
+                        root.focused-page = Math.mod(root.focused-page - 1 + root.pages.length, root.pages.length);
                         accept
                     } else if (event.text == Key.Home) {
                         root.focused-page = 0;
                         accept
                     } else if (event.text == Key.End) {
-                        root.focused-page = 4;
+                        root.focused-page = Math.max(root.pages.length - 1, 0);
                         accept
                     } else if (event.text == Key.Return || event.text == Key.Space) {
                         root.open-page(root.focused-page);

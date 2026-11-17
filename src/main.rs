@@ -59,6 +59,12 @@ fn item_count(window: &MainWindow) -> i32 {
     }
 }
 
+fn set_motion_duration(window: &MainWindow, reduced: bool) {
+    // Slint duration properties are expressed in nanoseconds on the Rust side.
+    let nanos: i64 = if reduced { 0 } else { 180_000_000 };
+    window.invoke_set_motion_duration(nanos);
+}
+
 fn toggle_setting(window: &MainWindow, index: i32) {
     match index {
         0 => {
@@ -72,6 +78,7 @@ fn toggle_setting(window: &MainWindow, index: i32) {
         2 => {
             let value = window.get_setting_reduced_motion();
             window.set_setting_reduced_motion(!value);
+            set_motion_duration(window, !value);
         }
         _ => {}
     }
@@ -85,6 +92,7 @@ fn apply_nav_action(window: &MainWindow, action: NavAction) {
     let state = Navigation {
         focused_page: window.get_focused_page(),
         active_page: window.get_active_page(),
+        page_count: window.get_pages().row_count() as i32,
         zone: old_zone,
         focused_item: window.get_focused_item(),
         selected_item: window.get_selected_item(),
@@ -121,6 +129,7 @@ fn seed_models(window: &MainWindow) {
     let games = shell::all_games();
     let emulators = shell::emulators();
 
+    window.set_pages(model(shell::pages()));
     window.set_last_played(model(shell::last_played()));
     window.set_recent_games(model(shell::recent_games()));
     window.set_library_games(model(games.clone()));

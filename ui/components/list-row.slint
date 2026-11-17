@@ -1,4 +1,4 @@
-import { Theme } from "../theme.slint";
+import { Theme, Motion } from "../theme.slint";
 
 export component ListRow inherits Rectangle {
     in property<bool> focused: false;
@@ -9,6 +9,11 @@ export component ListRow inherits Rectangle {
     background: root.focused ? Theme.sidebar-focus : Theme.panel;
     border-width: root.focused ? 2px : 1px;
     border-color: root.focused ? Theme.accent-cyan : (root.selected ? Theme.border-highlight : Theme.border);
+
+    animate border-color, background {
+        duration: Motion.duration;
+        easing: ease-in-out;
+    }
 
     HorizontalLayout {
         padding-left: 14px;

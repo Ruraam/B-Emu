@@ -60,6 +60,33 @@ fn nav_action(action: GamepadAction) -> NavAction {
     }
 }
 
+/// Tracks which controller owns navigation. The first connected controller
+/// wins; another one is only adopted after it disconnects. This prevents two
+/// controllers from fighting over the same focus state.
+#[derive(Debug, Default)]
+struct ActiveController(Option<usize>);
+
+impl ActiveController {
+    fn observe_connected(&mut self, id: usize) {
+        if self.0.is_none() {
+            self.0 = Some(id);
+        }
+    }
+
+    fn observe_disconnected(&mut self, id: usize) {
+        if self.0 == Some(id) {
+            self.0 = None;
+        }
+    }
+
+    fn accepts(&mut self, id: usize) -> bool {
+        if self.0.is_none() {
+            self.0 = Some(id);
+        }
+        self.0 == Some(id)
+    }
+}
+
 fn run_worker(window: slint::Weak<MainWindow>, stop_rx: Receiver<()>) {
     let mut input = match GamepadInput::new() {
         Ok(input) => input,
@@ -69,11 +96,13 @@ fn run_worker(window: slint::Weak<MainWindow>, stop_rx: Receiver<()>) {
         }
     };
 
+    let mut active = ActiveController::default();
     for gamepad in input.connected_gamepads() {
         eprintln!(
             "[b-emu] controller connected: {} (id {})",
             gamepad.name, gamepad.id
         );
+        active.observe_connected(gamepad.id);
     }
 
     loop {
@@ -86,14 +115,22 @@ fn run_worker(window: slint::Weak<MainWindow>, stop_rx: Receiver<()>) {
 
         for event in input.poll_events() {
             match event {
-                GamepadEvent::Connected(gamepad) => eprintln!(
-                    "[b-emu] controller connected: {} (id {})",
-                    gamepad.name, gamepad.id
-                ),
+                GamepadEvent::Connected(gamepad) => {
+                    eprintln!(
+                        "[b-emu] controller connected: {} (id {})",
+                        gamepad.name, gamepad.id
+                    );
+                    active.observe_connected(gamepad.id);
+                }
                 GamepadEvent::Disconnected { id } => {
                     eprintln!("[b-emu] controller disconnected (id {id})");
+                    active.observe_disconnected(id);
                 }
-                GamepadEvent::Action { id: _, action } => actions.push(nav_action(action)),
+                GamepadEvent::Action { id, action } => {
+                    if active.accepts(id) {
+                        actions.push(nav_action(action));
+                    }
+                }
             }
         }
 
@@ -118,5 +155,39 @@ fn run_worker(window: slint::Weak<MainWindow>, stop_rx: Receiver<()>) {
 
         // Avoid busy-spinning while keeping controller input responsive.
         thread::sleep(Duration::from_millis(8));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ActiveController;
+
+    #[test]
+    fn first_connected_controller_owns_navigation() {
+        let mut active = ActiveController::default();
+        active.observe_connected(3);
+        active.observe_connected(7);
+
+        assert!(active.accepts(3));
+        assert!(!active.accepts(7));
+    }
+
+    #[test]
+    fn another_controller_is_adopted_after_disconnect() {
+        let mut active = ActiveController::default();
+        active.observe_connected(3);
+        active.observe_disconnected(3);
+
+        assert!(active.accepts(7));
+        assert!(!active.accepts(3));
+    }
+
+    #[test]
+    fn actions_from_a_non_active_controller_are_ignored() {
+        let mut active = ActiveController::default();
+        assert!(active.accepts(1));
+
+        active.observe_disconnected(2);
+        assert!(active.accepts(1));
     }
 }

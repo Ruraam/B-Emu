@@ -30,6 +30,20 @@ fn game(title: &str, system: &str, detail: &str, accent: Color) -> GameCard {
     }
 }
 
+/// Sidebar pages. This is the single source of truth for the page count.
+pub fn pages() -> Vec<SharedString> {
+    [
+        "Accueil",
+        "Systèmes",
+        "Bibliothèque",
+        "Émulateurs",
+        "Paramètres",
+    ]
+    .into_iter()
+    .map(SharedString::from)
+    .collect()
+}
+
 /// The single game shown in the "Reprendre" card.
 pub fn last_played() -> Vec<GameCard> {
     vec![game(
