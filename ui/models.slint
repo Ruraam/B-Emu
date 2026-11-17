@@ -11,6 +11,8 @@ export enum NavAction {
     right,
     confirm,
     back,
+    favorite,
+    played,
 }
 
 export struct GameCard {
@@ -35,6 +37,7 @@ export struct IndexedGame {
     size: string,
     accent: color,
     duplicate: bool,
+    favorite: bool,
 }
 
 // Aggregated system information from the SQLite index.

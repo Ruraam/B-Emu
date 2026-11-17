@@ -126,6 +126,8 @@ fn button_action(button: Button) -> Option<GamepadAction> {
         Button::DPadRight => Some(GamepadAction::NavigateRight),
         Button::South => Some(GamepadAction::Confirm),
         Button::East => Some(GamepadAction::Back),
+        Button::West => Some(GamepadAction::ToggleFavorite),
+        Button::North => Some(GamepadAction::MarkPlayed),
         _ => None,
     }
 }
@@ -247,9 +249,15 @@ mod tests {
     }
 
     #[test]
-    fn unrelated_buttons_are_ignored() {
-        assert_eq!(button_action(Button::North), None);
-        assert_eq!(button_action(Button::West), None);
+    fn face_buttons_map_to_library_actions() {
+        assert_eq!(
+            button_action(Button::West),
+            Some(GamepadAction::ToggleFavorite)
+        );
+        assert_eq!(
+            button_action(Button::North),
+            Some(GamepadAction::MarkPlayed)
+        );
     }
 
     #[test]

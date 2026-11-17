@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     rc::Rc,
 };
@@ -11,7 +11,7 @@ use b_emu::{
         GamepadAction,
         navigation::{FocusZone, Navigation, apply_action},
     },
-    library::Library,
+    library::{GameRecord, Library},
     paths::AppPaths,
     wayland,
 };
@@ -47,6 +47,8 @@ fn action_from_nav(action: NavAction) -> GamepadAction {
         NavAction::Right => GamepadAction::NavigateRight,
         NavAction::Confirm => GamepadAction::Confirm,
         NavAction::Back => GamepadAction::Back,
+        NavAction::Favorite => GamepadAction::ToggleFavorite,
+        NavAction::Played => GamepadAction::MarkPlayed,
     }
 }
 
@@ -61,9 +63,9 @@ fn zone_from_ui(value: i32) -> FocusZone {
 /// Number of focusable items in the active screen.
 fn item_count(window: &MainWindow) -> i32 {
     match window.get_active_page() {
-        0 => 1 + window.get_recent_games().row_count() as i32, // hero card + recent games
+        0 => 1 + window.get_played_games().row_count() as i32, // hero card + played games
         1 => window.get_systems().row_count() as i32,
-        2 => window.get_library_games().row_count() as i32,
+        2 => 2 + window.get_library_games().row_count() as i32, // two filter pills + games
         3 => window.get_emulators().row_count() as i32,
         4 => 5 + window.get_game_dirs().row_count() as i32, // 3 toggles + dirs + add + scan
         _ => 0,
@@ -95,8 +97,8 @@ fn toggle_setting(window: &MainWindow, index: i32) {
     }
 }
 
-/// Single navigation path shared by keyboard and gamepad input.
-fn apply_nav_action(window: &MainWindow, action: NavAction) {
+/// Applies one shared navigation action coming from keyboard or gamepad.
+fn apply_nav_action(window: &MainWindow, db_path: &Path, action: NavAction) {
     let gamepad_action = action_from_nav(action);
     let old_zone = zone_from_ui(window.get_focus_zone());
 
@@ -109,7 +111,38 @@ fn apply_nav_action(window: &MainWindow, action: NavAction) {
         selected_item: window.get_selected_item(),
     };
 
-    let next = apply_action(state, gamepad_action, item_count(window));
+    let mut next = apply_action(state, gamepad_action, item_count(window));
+
+    // The library has two filter pills before the game rows.
+    if next.active_page == 2 && next.zone == FocusZone::Content {
+        match gamepad_action {
+            GamepadAction::Confirm if next.focused_item < 2 => {
+                window.set_show_favorites_only(next.focused_item == 1);
+                window.set_focused_item(0);
+                window.set_selected_item(-1);
+                if let Err(error) = refresh_library(window, db_path) {
+                    eprintln!("[b-emu] could not refresh library: {error}");
+                }
+                return;
+            }
+            GamepadAction::Confirm => {
+                next.selected_item = (next.focused_item - 2).max(0);
+            }
+            GamepadAction::ToggleFavorite | GamepadAction::MarkPlayed => {
+                if next.selected_item < 0 {
+                    window.set_selected_item((next.focused_item - 2).max(0));
+                }
+                library_item_action(window, db_path, gamepad_action);
+                return;
+            }
+            _ => {}
+        }
+    } else if gamepad_action == GamepadAction::ToggleFavorite
+        || gamepad_action == GamepadAction::MarkPlayed
+    {
+        // Library-only actions are ignored on other screens.
+        return;
+    }
 
     window.set_focused_page(next.focused_page);
     window.set_active_page(next.active_page);
@@ -145,41 +178,60 @@ fn game_size(bytes: i64) -> SharedString {
     }
 }
 
+fn path_key(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
 fn to_indexed_games(
-    records: Vec<b_emu::library::GameRecord>,
+    records: Vec<GameRecord>,
     duplicates: &HashMap<String, usize>,
+    favorites: &HashSet<String>,
 ) -> Vec<IndexedGame> {
     records
         .into_iter()
         .map(|game| IndexedGame {
             title: SharedString::from(game.title),
             system: SharedString::from(game.system.clone()),
-            path: SharedString::from(game.path.to_string_lossy().as_ref()),
+            path: SharedString::from(path_key(&game.path)),
             size: game_size(game.size),
             accent: shell::system_accent(&game.system),
             duplicate: duplicates.get(&game.checksum).copied().unwrap_or(0) > 1,
+            favorite: favorites.contains(&path_key(&game.path)),
         })
         .collect()
 }
 
-/// Reloads every library-backed model from the SQLite index.
 fn refresh_library(window: &MainWindow, db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let library = Library::open(db_path)?;
     let all = library.games()?;
     let counts = library.counts()?;
+    let favorites = library.favorite_paths()?;
 
     let mut duplicates: HashMap<String, usize> = HashMap::new();
     for game in &all {
         *duplicates.entry(game.checksum.clone()).or_insert(0) += 1;
     }
 
-    let recent: Vec<_> = library.recent(4)?;
-    let mut last_played = recent.clone();
+    let recent = library.recent(4)?;
+    let mut played = library.recently_played(4)?;
+    if played.is_empty() {
+        played = recent.clone();
+    }
+    let mut last_played = played.clone();
     last_played.truncate(1);
 
-    window.set_library_games(model(to_indexed_games(all, &duplicates)));
-    window.set_recent_games(model(to_indexed_games(recent, &duplicates)));
-    window.set_last_played(model(to_indexed_games(last_played, &duplicates)));
+    window.set_library_games(model(to_indexed_games(
+        filtered_games(&library, window)?,
+        &duplicates,
+        &favorites,
+    )));
+    window.set_recent_games(model(to_indexed_games(recent, &duplicates, &favorites)));
+    window.set_played_games(model(to_indexed_games(played, &duplicates, &favorites)));
+    window.set_last_played(model(to_indexed_games(
+        last_played,
+        &duplicates,
+        &favorites,
+    )));
 
     let systems: Vec<SystemStat> = library
         .systems()?
@@ -195,7 +247,51 @@ fn refresh_library(window: &MainWindow, db_path: &Path) -> Result<(), Box<dyn st
     window.set_games_count(counts.games);
     window.set_systems_count(counts.systems);
     window.set_duplicates_count(counts.duplicates);
+    window.set_favorites_count(favorites.len() as i32);
     Ok(())
+}
+
+fn filtered_games(
+    library: &Library,
+    window: &MainWindow,
+) -> Result<Vec<GameRecord>, Box<dyn std::error::Error>> {
+    let search = window.get_search_text();
+    let mut records = if search.is_empty() {
+        library.games()?
+    } else {
+        library.search(&search)?
+    };
+
+    if window.get_show_favorites_only() {
+        let favorites = library.favorite_paths()?;
+        records.retain(|game| favorites.contains(&path_key(&game.path)));
+    }
+    Ok(records)
+}
+
+fn library_item_action(window: &MainWindow, db_path: &Path, action: GamepadAction) {
+    let index = window.get_selected_item();
+    let games = window.get_library_games();
+    let Some(game) = games.row_data(index.max(0) as usize) else {
+        return;
+    };
+
+    let result = match action {
+        GamepadAction::ToggleFavorite => Library::open(db_path)
+            .and_then(|library| library.toggle_favorite(&game.path))
+            .map(|_| ()),
+        GamepadAction::MarkPlayed => Library::open(db_path)
+            .and_then(|library| library.mark_played(&game.path))
+            .map(|_| ()),
+        _ => Ok(()),
+    };
+
+    if let Err(error) = result {
+        eprintln!("[b-emu] library action failed: {error}");
+    }
+    if let Err(error) = refresh_library(window, db_path) {
+        eprintln!("[b-emu] could not refresh library: {error}");
+    }
 }
 
 fn refresh_dirs(window: &MainWindow, config_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -350,9 +446,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let scan_slot: Rc<RefCell<Option<scan_worker::ScanWorker>>> = Rc::new(RefCell::new(None));
 
     let weak = window.as_weak();
+    let db = db_path.clone();
     window.on_request_action(move |action| {
         if let Some(window) = weak.upgrade() {
-            apply_nav_action(&window, action);
+            apply_nav_action(&window, &db, action);
         }
     });
 
@@ -393,20 +490,54 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let db = db_path.clone();
     window.on_search_changed(move |text: SharedString| {
         if let Some(window) = weak.upgrade() {
-            match Library::open(&db).and_then(|library| library.search(&text)) {
-                Ok(records) => {
-                    let mut duplicates: HashMap<String, usize> = HashMap::new();
-                    if let Ok(all) = Library::open(&db).and_then(|library| library.games()) {
-                        for game in &all {
-                            *duplicates.entry(game.checksum.clone()).or_insert(0) += 1;
-                        }
+            window.set_search_text(text);
+            window.set_focused_item(0);
+            window.set_selected_item(-1);
+            if let Err(error) = refresh_library(&window, &db) {
+                eprintln!("[b-emu] library search failed: {error}");
+            }
+        }
+    });
+
+    let weak = window.as_weak();
+    let db = db_path.clone();
+    window.on_set_favorites_filter(move |enabled| {
+        if let Some(window) = weak.upgrade() {
+            window.set_show_favorites_only(enabled);
+            window.set_focused_item(0);
+            window.set_selected_item(-1);
+            if let Err(error) = refresh_library(&window, &db) {
+                eprintln!("[b-emu] could not filter favorites: {error}");
+            }
+        }
+    });
+
+    let weak = window.as_weak();
+    let db = db_path.clone();
+    window.on_toggle_favorite(move |path: SharedString| {
+        if let Some(window) = weak.upgrade() {
+            match Library::open(&db).and_then(|library| library.toggle_favorite(&path)) {
+                Ok(_) => {
+                    if let Err(error) = refresh_library(&window, &db) {
+                        eprintln!("[b-emu] could not refresh favorites: {error}");
                     }
-                    window.set_search_text(text);
-                    window.set_library_games(model(to_indexed_games(records, &duplicates)));
-                    window.set_focused_item(0);
-                    window.set_selected_item(-1);
                 }
-                Err(error) => eprintln!("[b-emu] library search failed: {error}"),
+                Err(error) => eprintln!("[b-emu] could not toggle favorite: {error}"),
+            }
+        }
+    });
+
+    let weak = window.as_weak();
+    let db = db_path.clone();
+    window.on_mark_played(move |path: SharedString| {
+        if let Some(window) = weak.upgrade() {
+            match Library::open(&db).and_then(|library| library.mark_played(&path)) {
+                Ok(()) => {
+                    if let Err(error) = refresh_library(&window, &db) {
+                        eprintln!("[b-emu] could not refresh play history: {error}");
+                    }
+                }
+                Err(error) => eprintln!("[b-emu] could not record play: {error}"),
             }
         }
     });

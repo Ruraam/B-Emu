@@ -6,12 +6,12 @@ import { IndexedGame } from "../models.slint";
 
 export component HomeScreen inherits VerticalLayout {
     in property<[IndexedGame]> last-played;
-    in property<[IndexedGame]> recent-games;
+    in property<[IndexedGame]> played-games;
     in property<int> focused-item: 0;
     in property<bool> content-focused: false;
     in property<int> games-count: 0;
     in property<int> systems-count: 0;
-    in property<int> emulators-count: 0;
+    in property<int> favorites-count: 0;
     in property<int> duplicates-count: 0;
 
     spacing: 20px;
@@ -80,7 +80,7 @@ export component HomeScreen inherits VerticalLayout {
     }
 
     Text {
-        text: "JEUX INDEXÉS";
+        text: "RÉCEMMENT JOUÉS";
         color: Theme.text-muted;
         font-size: 10px;
         font-weight: 700;
@@ -90,7 +90,7 @@ export component HomeScreen inherits VerticalLayout {
     HorizontalLayout {
         spacing: 14px;
 
-        for game[i] in root.recent-games: GlassPanel {
+        for game[i] in root.played-games: GlassPanel {
             horizontal-stretch: 1;
             min-width: 140px;
             preferred-height: 132px;
@@ -147,6 +147,13 @@ export component HomeScreen inherits VerticalLayout {
             panel-padding: 14px;
             Text { text: "SYSTÈMES"; color: Theme.text-muted; font-size: 9px; font-weight: 700; letter-spacing: 1.2px; }
             Text { text: root.systems-count; color: Theme.text-primary; font-size: 22px; font-weight: 800; }
+        }
+
+        GlassPanel {
+            horizontal-stretch: 1;
+            panel-padding: 14px;
+            Text { text: "FAVORIS"; color: Theme.text-muted; font-size: 9px; font-weight: 700; letter-spacing: 1.2px; }
+            Text { text: root.favorites-count; color: Theme.accent-cyan; font-size: 22px; font-weight: 800; }
         }
 
         GlassPanel {

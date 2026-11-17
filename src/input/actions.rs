@@ -9,4 +9,6 @@ pub enum GamepadAction {
     NavigateRight,
     Confirm,
     Back,
+    ToggleFavorite,
+    MarkPlayed,
 }

@@ -57,6 +57,8 @@ fn nav_action(action: GamepadAction) -> NavAction {
         GamepadAction::NavigateRight => NavAction::Right,
         GamepadAction::Confirm => NavAction::Confirm,
         GamepadAction::Back => NavAction::Back,
+        GamepadAction::ToggleFavorite => NavAction::Favorite,
+        GamepadAction::MarkPlayed => NavAction::Played,
     }
 }
 

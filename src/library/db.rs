@@ -4,6 +4,7 @@ use std::{
     collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use rusqlite::{Connection, params};
@@ -37,6 +38,13 @@ pub struct LibraryDb {
     conn: Connection,
 }
 
+fn now_ns() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos() as i64)
+        .unwrap_or(0)
+}
+
 impl LibraryDb {
     pub fn open(path: &Path) -> Result<Self, rusqlite::Error> {
         if let Some(parent) = path.parent() {
@@ -66,8 +74,18 @@ impl LibraryDb {
                 checksum TEXT NOT NULL,
                 source_dir TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS favorites (
+                path TEXT PRIMARY KEY,
+                created_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS play_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                path TEXT NOT NULL,
+                played_at INTEGER NOT NULL
+            );
             CREATE INDEX IF NOT EXISTS games_system ON games(system);
-            CREATE INDEX IF NOT EXISTS games_checksum ON games(checksum);",
+            CREATE INDEX IF NOT EXISTS games_checksum ON games(checksum);
+            CREATE INDEX IF NOT EXISTS play_history_played_at ON play_history(played_at DESC);",
         )
     }
 
@@ -118,10 +136,15 @@ impl LibraryDb {
         let mut removed = 0;
         for path in self.all_paths()? {
             if !seen.contains(&path) {
-                removed += self.conn.execute(
-                    "DELETE FROM games WHERE path = ?1",
-                    params![path.to_string_lossy()],
-                )?;
+                let key = path.to_string_lossy();
+                let key = key.as_ref();
+                removed += self
+                    .conn
+                    .execute("DELETE FROM games WHERE path = ?1", params![key])?;
+                self.conn
+                    .execute("DELETE FROM favorites WHERE path = ?1", params![key])?;
+                self.conn
+                    .execute("DELETE FROM play_history WHERE path = ?1", params![key])?;
             }
         }
         Ok(removed)
@@ -144,6 +167,60 @@ impl LibraryDb {
         self.query_games(
             "SELECT path, title, system, size, checksum, source_dir FROM games
              ORDER BY modified_ns DESC, title LIMIT ?1",
+            [limit],
+        )
+    }
+
+    pub fn favorites(&self) -> Result<Vec<GameRecord>, rusqlite::Error> {
+        self.query_games(
+            "SELECT g.path, g.title, g.system, g.size, g.checksum, g.source_dir
+             FROM favorites f JOIN games g ON g.path = f.path
+             ORDER BY f.created_at DESC",
+            [],
+        )
+    }
+
+    pub fn favorite_paths(&self) -> Result<HashSet<String>, rusqlite::Error> {
+        let mut statement = self.conn.prepare("SELECT path FROM favorites")?;
+        let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+        rows.collect()
+    }
+
+    /// Returns true when the game is now a favorite.
+    pub fn toggle_favorite(&self, path: &str) -> Result<bool, rusqlite::Error> {
+        let existing: bool = self.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM favorites WHERE path = ?1)",
+            params![path],
+            |row| row.get(0),
+        )?;
+
+        if existing {
+            self.conn
+                .execute("DELETE FROM favorites WHERE path = ?1", params![path])?;
+            Ok(false)
+        } else {
+            self.conn.execute(
+                "INSERT INTO favorites (path, created_at) VALUES (?1, ?2)",
+                params![path, now_ns()],
+            )?;
+            Ok(true)
+        }
+    }
+
+    pub fn mark_played(&self, path: &str) -> Result<(), rusqlite::Error> {
+        self.conn.execute(
+            "INSERT INTO play_history (path, played_at) VALUES (?1, ?2)",
+            params![path, now_ns()],
+        )?;
+        Ok(())
+    }
+
+    pub fn recently_played(&self, limit: i32) -> Result<Vec<GameRecord>, rusqlite::Error> {
+        self.query_games(
+            "SELECT g.path, g.title, g.system, g.size, g.checksum, g.source_dir
+             FROM play_history h JOIN games g ON g.path = h.path
+             GROUP BY g.path
+             ORDER BY MAX(h.played_at) DESC LIMIT ?1",
             [limit],
         )
     }
@@ -218,6 +295,7 @@ impl LibraryDb {
 mod tests {
     use super::LibraryDb;
     use crate::library::scanner::ScannedGame;
+    use std::collections::HashSet;
 
     fn game(name: &str, system: &str, checksum: &str) -> ScannedGame {
         ScannedGame {
@@ -275,6 +353,48 @@ mod tests {
         let seen = [game("a.nes", "NES", "a").path].into_iter().collect();
         assert_eq!(db.remove_missing(&seen).unwrap(), 1);
         assert_eq!(db.games().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn favorites_can_be_toggled_and_listed() {
+        let db = LibraryDb::open_in_memory().unwrap();
+        let path = game("a.nes", "NES", "a");
+        db.upsert(&path).unwrap();
+
+        let key = path.path.to_string_lossy().to_string();
+        assert!(db.toggle_favorite(&key).unwrap());
+        assert!(db.favorite_paths().unwrap().contains(&key));
+        assert_eq!(db.favorites().unwrap().len(), 1);
+
+        assert!(!db.toggle_favorite(&key).unwrap());
+        assert!(db.favorites().unwrap().is_empty());
+    }
+
+    #[test]
+    fn play_history_tracks_recent_games() {
+        let db = LibraryDb::open_in_memory().unwrap();
+        db.upsert(&game("a.nes", "NES", "a")).unwrap();
+        db.upsert(&game("b.nes", "NES", "b")).unwrap();
+
+        db.mark_played("/roms/a.nes").unwrap();
+        db.mark_played("/roms/b.nes").unwrap();
+        db.mark_played("/roms/a.nes").unwrap();
+
+        let recent = db.recently_played(2).unwrap();
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0].title, "a.nes");
+    }
+
+    #[test]
+    fn removing_a_game_cleans_up_favorites_and_history() {
+        let db = LibraryDb::open_in_memory().unwrap();
+        db.upsert(&game("a.nes", "NES", "a")).unwrap();
+        db.toggle_favorite("/roms/a.nes").unwrap();
+        db.mark_played("/roms/a.nes").unwrap();
+        db.remove_missing(&HashSet::new()).unwrap();
+
+        assert!(db.favorite_paths().unwrap().is_empty());
+        assert!(db.recently_played(10).unwrap().is_empty());
     }
 
     #[test]

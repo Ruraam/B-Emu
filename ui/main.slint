@@ -25,6 +25,7 @@ export component MainWindow inherits Window {
     in property<[string]> pages;
     in property<[IndexedGame]> last-played;
     in property<[IndexedGame]> recent-games;
+    in property<[IndexedGame]> played-games;
     in property<[IndexedGame]> library-games;
     in property<[SystemStat]> systems;
     in property<[EmulatorRow]> emulators;
@@ -32,6 +33,7 @@ export component MainWindow inherits Window {
     in-out property<int> games-count: 0;
     in-out property<int> systems-count: 0;
     in-out property<int> duplicates-count: 0;
+    in-out property<int> favorites-count: 0;
     in-out property<int> emulators-ready-count: 0;
 
     // Library settings and scan state.
@@ -39,6 +41,7 @@ export component MainWindow inherits Window {
     in-out property<string> new-dir-text: "";
     in-out property<string> scan-status: "Prêt";
     in-out property<float> scan-progress: 0;
+    in-out property<bool> show-favorites-only: false;
 
     callback request-action(NavAction);
     callback search-changed(string);
@@ -50,6 +53,9 @@ export component MainWindow inherits Window {
     callback remove-dir(int);
     callback scan-now();
     callback remove-focused-dir();
+    callback set-favorites-filter(bool);
+    callback toggle-favorite(string);
+    callback mark-played(string);
 
     remove-focused-dir() => { root.remove-dir(root.focused-item - 3); }
 
@@ -197,6 +203,12 @@ export component MainWindow inherits Window {
                     } else if (event.text == Key.Escape || event.text == Key.Backspace) {
                         root.request-action(NavAction.back);
                         accept
+                    } else if (event.text == "f" || event.text == "F") {
+                        root.request-action(NavAction.favorite);
+                        accept
+                    } else if (event.text == "p" || event.text == "P") {
+                        root.request-action(NavAction.played);
+                        accept
                     } else {
                         reject
                     }
@@ -208,11 +220,11 @@ export component MainWindow inherits Window {
 
                     if root.active-page == 0: HomeScreen {
                         last-played: root.last-played;
-                        recent-games: root.recent-games;
+                        played-games: root.played-games;
                         games-count: root.games-count;
                         systems-count: root.systems-count;
+                        favorites-count: root.favorites-count;
                         duplicates-count: root.duplicates-count;
-                        emulators-count: root.emulators-ready-count;
                         focused-item: root.focused-item;
                         content-focused: root.focus-zone == 1;
                     }
@@ -228,8 +240,12 @@ export component MainWindow inherits Window {
                         focused-item: root.focused-item;
                         content-focused: root.focus-zone == 1;
                         selected-item: root.selected-item;
+                        show-favorites-only: root.show-favorites-only;
                         search-text: root.search-text;
                         search-changed(text) => { root.search-changed(text); }
+                        set-favorites-filter(value) => { root.set-favorites-filter(value); }
+                        toggle-favorite(path) => { root.toggle-favorite(path); }
+                        mark-played(path) => { root.mark-played(path); }
                     }
 
                     if root.active-page == 3: EmulatorsScreen {

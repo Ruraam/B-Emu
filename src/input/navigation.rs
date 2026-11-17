@@ -85,7 +85,10 @@ pub fn apply_action(state: Navigation, action: GamepadAction, item_count: i32) -
                 selected_item: -1,
                 ..state
             },
-            GamepadAction::NavigateLeft | GamepadAction::NavigateRight => state,
+            GamepadAction::NavigateLeft
+            | GamepadAction::NavigateRight
+            | GamepadAction::ToggleFavorite
+            | GamepadAction::MarkPlayed => state,
         },
         FocusZone::Content => match action {
             GamepadAction::NavigateUp => Navigation {
@@ -106,7 +109,10 @@ pub fn apply_action(state: Navigation, action: GamepadAction, item_count: i32) -
                 selected_item: -1,
                 ..state
             },
-            GamepadAction::NavigateLeft | GamepadAction::NavigateRight => state,
+            GamepadAction::NavigateLeft
+            | GamepadAction::NavigateRight
+            | GamepadAction::ToggleFavorite
+            | GamepadAction::MarkPlayed => state,
         },
     }
 }

@@ -29,6 +29,8 @@ events into the normalized actions in `input::GamepadAction`.
 | D-pad right / left stick right | Navigate right |
 | South face button (A on common Xbox layouts) | Confirm |
 | East face button (B on common Xbox layouts) | Back to Home |
+| West face button (X on common Xbox layouts) | Toggle favorite on the selected game |
+| North face button (Y on common Xbox layouts) | Mark the selected game as played |
 
 Analog directions use a 0.65 activation threshold and 0.35 return threshold
 to reduce jitter. Direction changes are emitted once per threshold transition,

@@ -46,6 +46,11 @@ The service exposes games, full-text-ish search (case-insensitive `LIKE` on
 title and system), recent games, counts, and per-system summaries. Files that
 share a checksum are flagged as duplicates in the UI without being deleted.
 
+Two extra tables track user state: `favorites` and `play_history`. Favorites can
+be toggled per game; play history records when a game was marked as played
+(the launch coordinator arrives in Phase 3, so no game process is started yet).
+Rows for games removed from the index are cleaned up automatically.
+
 ## Interface
 
 - **Home / Systems / Library** are now backed by the index. With no game
@@ -53,6 +58,10 @@ share a checksum are flagged as duplicates in the UI without being deleted.
 - **Settings** manages game directories, shows scan progress and the last scan
   report, and can start a new scan. With auto-scan enabled, configured
   directories are indexed at startup.
+- **Library** has "Tous / Favoris" filters, a favorites star per game, and
+  detail actions to toggle a favorite or record a play. The same actions are
+  available from the controller (West/North) and the keyboard (`F`/`P`).
+- **Home** shows recently played games and a favorites counter.
 
 ## Validation
 

@@ -84,6 +84,27 @@ impl Library {
         Ok(self.db.recent(limit)?)
     }
 
+    pub fn favorites(&self) -> Result<Vec<GameRecord>, LibraryError> {
+        Ok(self.db.favorites()?)
+    }
+
+    pub fn favorite_paths(&self) -> Result<HashSet<String>, LibraryError> {
+        Ok(self.db.favorite_paths()?)
+    }
+
+    /// Returns true when the game is now a favorite.
+    pub fn toggle_favorite(&self, path: &str) -> Result<bool, LibraryError> {
+        Ok(self.db.toggle_favorite(path)?)
+    }
+
+    pub fn mark_played(&self, path: &str) -> Result<(), LibraryError> {
+        Ok(self.db.mark_played(path)?)
+    }
+
+    pub fn recently_played(&self, limit: i32) -> Result<Vec<GameRecord>, LibraryError> {
+        Ok(self.db.recently_played(limit)?)
+    }
+
     pub fn counts(&self) -> Result<Counts, LibraryError> {
         Ok(self.db.counts()?)
     }
