@@ -16,8 +16,42 @@ It aims to provide a modern, controller-first library for discovering, organizin
 
 ## Architecture
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the initial architecture and implementation boundaries.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the architecture and [docs/PHASE-0.md](docs/PHASE-0.md) for the Wayland prototype, renderer policy, and acceptance tests.
 
 ## Status
 
-Early architecture phase. The repository is being prepared before implementation begins.
+Phase 0 validated the Wayland-only build and startup policy. Phase 1 delivered
+five data-driven screens (Home, Systems, Library, Emulators, Settings) with a
+unified keyboard, mouse and gamepad focus model. Phase 2 adds configurable game
+directories, a read-only SHA-256 scanner and a local SQLite index that backs the
+Home, Systems and Library screens. Phase 3 adds emulator discovery on `PATH`,
+capability-driven settings, and supervised launching built from `OsString`
+argument arrays (never shell command strings). The registry covers over a
+hundred emulators and accepts per-emulator executable overrides. Phase 4 adds local
+metadata with provenance, a sidecar artwork cache and BIOS/firmware validation.
+Phase 5 persists preferences, applies scans transactionally, validates launch
+paths before starting an emulator, and produces a signed rootless ULPM `.lpk`.
+
+To try the shell interactively from the project files (no `.lpk` needed), run
+`bash scripts/try-interactive.sh`: it creates a small demo library, starts a
+nested Weston on the current X11 display, and launches the development binary
+inside it. `bash scripts/smoke-wayland.sh` is the headless equivalent. On a
+native Wayland session, `bash scripts/prepare-demo.sh` only prepares the demo
+XDG directories and prints the environment to export before running
+`./target/debug/b-emu`.
+
+Release artifacts are built with `bash scripts/release-lpk.sh` (signed `.lpk`
+plus a minimal signed repository); `bash scripts/smoke-wayland.sh` runs the
+headless startup test for the binary or the package, with a parametrizable
+compositor command.
+
+CI validates formatting, the Wayland-only dependency graph, the Linux build,
+unit tests, and a headless Weston startup smoke test. See
+[docs/PHASE-5.md](docs/PHASE-5.md) for hardening,
+[docs/PHASE-4.md](docs/PHASE-4.md) for metadata and firmware,
+[docs/PHASE-3.md](docs/PHASE-3.md) for the emulator contract,
+[docs/PHASE-2.md](docs/PHASE-2.md) for the library design,
+[docs/GAMEPAD.md](docs/GAMEPAD.md) for the input model, and
+[docs/PHASE-0.md](docs/PHASE-0.md) for the renderer and Wayland policy.
+
+Deployment requirements and the planned rootless ULPM `.lpk` distribution model are documented in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).

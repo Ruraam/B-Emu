@@ -1,0 +1,160 @@
+name: Phase 0 — Wayland prototype
+
+on:
+  push:
+    branches:
+      - main
+      - phase-0-wayland-prototype
+      - phase-1-app-shell
+      - phase-1-navigation
+      - phase-1-gamepad-input
+      - phase-1-gamepad-ui
+  pull_request:
+    branches:
+      - main
+      - phase-0-wayland-prototype
+      - phase-1-app-shell
+      - phase-1-navigation
+      - phase-1-gamepad-input
+      - phase-1-gamepad-ui
+
+permissions:
+  contents: read
+
+jobs:
+  linux-wayland:
+    name: Linux / Wayland-only build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            pkg-config \
+            binutils \
+            jq \
+            libudev-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
+            libegl1-mesa-dev \
+            libgl1-mesa-dev \
+            libfontconfig1-dev \
+            weston \
+            wayland-utils
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Audit backend features (X11 must be absent)
+        run: bash scripts/check-wayland-features.sh
+
+      - name: Audit launch safety (no shell command strings)
+        run: bash scripts/check-launch-safety.sh
+
+      - name: Validate LPK architecture selection
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/package-lpk.sh scripts/release-lpk.sh
+          if ARCH=unknown bash scripts/package-lpk.sh; then
+            echo "Unsupported LPK architecture was accepted." >&2
+            exit 1
+          fi
+
+      - name: Compile all targets
+        run: cargo check --all-targets
+
+      - name: Run unit tests
+        run: cargo test --all-targets
+
+      - name: Build B-Emu executable
+        run: cargo build --bin b-emu
+
+      - name: Verify LPK native binary architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          fake_ulpm="$RUNNER_TEMP/fake-ulpm"
+          cat > "$fake_ulpm" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          case "$1" in
+            pack) printf "fake-lpk\\n" > "$4" ;;
+            inspect) test -s "$2" ;;
+            *) echo "Unexpected fake ULPM command: $1" >&2; exit 1 ;;
+          esac
+          EOF
+          chmod +x "$fake_ulpm"
+          ULPM="$fake_ulpm" ARCH=amd64 OUT="$RUNNER_TEMP/b-emu-amd64.lpk" \
+            bash scripts/package-lpk.sh
+          test -s "$RUNNER_TEMP/b-emu-amd64.lpk"
+
+      - name: Verify native Wayland connection and B-Emu startup with Weston headless
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          export XDG_RUNTIME_DIR="$RUNNER_TEMP/b-emu-runtime"
+          export WAYLAND_DISPLAY="wayland-b-emu-test"
+          mkdir -p "$XDG_RUNTIME_DIR"
+          chmod 700 "$XDG_RUNTIME_DIR"
+
+          weston \
+            --backend=headless \
+            --renderer=pixman \
+            --socket="$WAYLAND_DISPLAY" \
+            --idle-time=0 \
+            --no-config \
+            --log="$RUNNER_TEMP/weston.log" &
+          weston_pid=$!
+
+          cleanup() {
+            kill "$weston_pid" 2>/dev/null || true
+            wait "$weston_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for attempt in $(seq 1 50); do
+            if [[ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]]; then
+              break
+            fi
+            if ! kill -0 "$weston_pid" 2>/dev/null; then
+              cat "$RUNNER_TEMP/weston.log"
+              echo "Weston exited before creating its Wayland socket." >&2
+              exit 1
+            fi
+            sleep 0.1
+          done
+
+          if [[ ! -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]]; then
+            cat "$RUNNER_TEMP/weston.log"
+            echo "Weston did not create the expected Wayland socket." >&2
+            exit 1
+          fi
+
+          wayland-info > "$RUNNER_TEMP/wayland-info.log"
+          grep -q "wl_compositor" "$RUNNER_TEMP/wayland-info.log"
+          echo "A native Wayland client connected to Weston and completed registry discovery."
+
+          set +e
+          env -u DISPLAY LIBGL_ALWAYS_SOFTWARE=1 \
+            timeout --signal=TERM --kill-after=2s 5s \
+            ./target/debug/b-emu > "$RUNNER_TEMP/b-emu.log" 2>&1
+          app_status=$?
+          set -e
+
+          if [[ "$app_status" -ne 124 ]]; then
+            cat "$RUNNER_TEMP/b-emu.log"
+            echo "B-Emu did not remain running under the headless Wayland compositor (exit: $app_status)." >&2
+            exit 1
+          fi
+
+          echo "B-Emu remained running for the smoke-test window under native Wayland."

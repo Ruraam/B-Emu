@@ -1,0 +1,254 @@
+import { Theme } from "../theme.slint";
+import { GlassPanel } from "../components/glass-panel.slint";
+import { PageHeader } from "../components/page-header.slint";
+import { ListRow } from "../components/list-row.slint";
+import { StatusPill } from "../components/status-pill.slint";
+import { ConsoleLogo } from "../components/console-logo.slint";
+import { IndexedGame } from "../models.slint";
+
+export component LibraryScreen inherits VerticalLayout {
+    in property<[IndexedGame]> games;
+    in property<int> focused-item: 0;
+    in property<bool> content-focused: false;
+    in property<int> selected-item: -1;
+    in property<bool> show-favorites-only: false;
+    in-out property<string> search-text: "";
+    in-out property<string> launch-status: "";
+    callback search-changed(string);
+    callback set-favorites-filter(bool);
+    callback toggle-favorite(string);
+    callback mark-played(string);
+    callback launch-game(string, string);
+
+    spacing: 12px;
+
+    PageHeader {
+        eyebrow: "B-EMU / BIBLIOTHÈQUE";
+        title: "Bibliothèque";
+        subtitle: "Jeux indexés depuis vos dossiers. Le scan ne modifie jamais vos fichiers.";
+    }
+
+    HorizontalLayout {
+        spacing: 12px;
+
+        Rectangle {
+            width: 96px;
+            height: 32px;
+            border-radius: 16px;
+            background: root.content-focused && root.focused-item == 0 ? Theme.sidebar-focus : Theme.panel;
+            border-width: root.content-focused && root.focused-item == 0 ? 2px : 1px;
+            border-color: root.content-focused && root.focused-item == 0 ? Theme.accent-cyan : Theme.border;
+            Text { text: "TOUS"; color: Theme.text-primary; font-size: 11px; font-weight: 700; letter-spacing: 1px; vertical-alignment: center; horizontal-alignment: center; }
+            TouchArea { mouse-cursor: pointer; clicked => { root.set-favorites-filter(false); } }
+        }
+
+        Rectangle {
+            width: 116px;
+            height: 32px;
+            border-radius: 16px;
+            background: root.content-focused && root.focused-item == 1 ? Theme.sidebar-focus : Theme.panel;
+            border-width: root.content-focused && root.focused-item == 1 ? 2px : 1px;
+            border-color: root.content-focused && root.focused-item == 1 ? Theme.accent-cyan : Theme.border;
+            Text { text: "FAVORIS"; color: root.show-favorites-only ? Theme.accent-cyan : Theme.text-primary; font-size: 11px; font-weight: 700; letter-spacing: 1px; vertical-alignment: center; horizontal-alignment: center; }
+            TouchArea { mouse-cursor: pointer; clicked => { root.set-favorites-filter(true); } }
+        }
+
+        GlassPanel {
+            horizontal-stretch: 1;
+            panel-padding: 4px;
+            HorizontalLayout {
+                spacing: 10px;
+                padding-left: 12px;
+                padding-right: 12px;
+                Text { text: "⌕"; color: Theme.accent-cyan; font-size: 18px; vertical-alignment: center; }
+                TextInput {
+                    horizontal-stretch: 1;
+                    text: root.search-text;
+                    color: Theme.text-primary;
+                    font-size: 13px;
+                    vertical-alignment: center;
+                    edited => { root.search-changed(self.text); }
+                }
+            }
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 16px;
+        vertical-stretch: 1;
+
+        VerticalLayout {
+            horizontal-stretch: 2;
+            spacing: 6px;
+
+            Text {
+                text: root.show-favorites-only ? "FAVORIS" : "JEUX INDEXÉS";
+                color: Theme.text-muted;
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: 1.5px;
+            }
+
+            if root.games.length == 0: GlassPanel {
+                vertical-stretch: 1;
+                Text {
+                    text: root.show-favorites-only
+                        ? "Aucun favori. Sélectionnez un jeu puis appuyez sur X."
+                        : "Aucun jeu indexé. Ajoutez un dossier dans Paramètres puis lancez une analyse.";
+                    color: Theme.text-secondary;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+            }
+
+            for game[i] in root.games: ListRow {
+                row-height: 46px;
+                row-padding: 10px;
+                focused: root.content-focused && root.focused-item == i + 2;
+                selected: root.selected-item == i;
+
+                ConsoleLogo { system: game.system; width: 52px; height: 22px; }
+
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 1px;
+                    Text { text: game.title; color: Theme.text-primary; font-size: 13px; font-weight: 600; overflow: elide; }
+                    Text { text: game.system; color: Theme.text-secondary; font-size: 10px; }
+                }
+
+                Text { text: game.size; color: Theme.text-muted; font-size: 10px; vertical-alignment: center; }
+                if game.favorite: Text { text: "★"; color: Theme.accent-cyan; font-size: 14px; vertical-alignment: center; }
+                if game.duplicate: StatusPill { label: "DOUBLON"; positive: false; }
+            }
+
+            Rectangle { vertical-stretch: 1; background: transparent; }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 10px;
+
+            GlassPanel {
+                vertical-stretch: 1;
+                panel-padding: 14px;
+                panel-spacing: 8px;
+                focused: root.content-focused && root.selected-item >= 0;
+
+                if root.selected-item >= 0 && root.selected-item < root.games.length: ConsoleLogo {
+                    system: root.games[root.selected-item].system;
+                    width: 100%;
+                    height: 64px;
+                }
+
+                Text { text: "DÉTAILS"; color: Theme.accent-indigo; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
+
+                Text {
+                    text: root.selected-item >= 0 && root.selected-item < root.games.length ? root.games[root.selected-item].title : "Aucun jeu sélectionné";
+                    color: Theme.text-primary;
+                    font-size: 18px;
+                    font-weight: 700;
+                    wrap: word-wrap;
+                }
+
+                Text {
+                    text: root.selected-item >= 0 && root.selected-item < root.games.length ? root.games[root.selected-item].system : "Choisissez un jeu dans la liste.";
+                    color: Theme.accent-blue;
+                    font-size: 12px;
+                }
+
+                Text {
+                    text: root.selected-item >= 0 && root.selected-item < root.games.length
+                        ? (root.games[root.selected-item].year != "" ? root.games[root.selected-item].year + " · " : "") + root.games[root.selected-item].region
+                        : "";
+                    color: Theme.text-muted;
+                    font-size: 10px;
+                }
+
+                Text {
+                    text: root.selected-item >= 0 && root.selected-item < root.games.length ? root.games[root.selected-item].description : "";
+                    color: Theme.text-secondary;
+                    font-size: 11px;
+                    wrap: word-wrap;
+                }
+
+                Text {
+                    text: root.selected-item >= 0 && root.selected-item < root.games.length ? "Source : " + root.games[root.selected-item].provider : "";
+                    color: Theme.text-muted;
+                    font-size: 10px;
+                }
+
+                Text {
+                    text: root.selected-item >= 0 && root.selected-item < root.games.length ? root.games[root.selected-item].path : "";
+                    color: Theme.text-muted;
+                    font-size: 10px;
+                    wrap: word-wrap;
+                }
+
+                Rectangle { vertical-stretch: 1; background: transparent; }
+
+                Rectangle {
+                    height: 32px;
+                    border-radius: 8px;
+                    background: Theme.sidebar-focus;
+                    border-width: 1px;
+                    border-color: Theme.border-highlight;
+                    visible: root.selected-item >= 0 && root.selected-item < root.games.length;
+                    Text {
+                        text: root.selected-item >= 0 && root.selected-item < root.games.length && root.games[root.selected-item].favorite ? "★ RETIRER DES FAVORIS" : "☆ AJOUTER AUX FAVORIS";
+                        color: Theme.accent-cyan;
+                        font-size: 10px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+                    TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            if (root.selected-item >= 0 && root.selected-item < root.games.length) {
+                                root.toggle-favorite(root.games[root.selected-item].path);
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    height: 32px;
+                    border-radius: 8px;
+                    background: Theme.sidebar-focus;
+                    border-width: 1px;
+                    border-color: Theme.border-highlight;
+                    visible: root.selected-item >= 0 && root.selected-item < root.games.length;
+                    Text { text: "▶ MARQUER COMME JOUÉ"; color: Theme.accent-blue; font-size: 10px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                    TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            if (root.selected-item >= 0 && root.selected-item < root.games.length) {
+                                root.mark-played(root.games[root.selected-item].path);
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    height: 32px;
+                    border-radius: 8px;
+                    background: Theme.panel-raised;
+                    border-width: 1px;
+                    border-color: Theme.border-highlight;
+                    visible: root.selected-item >= 0 && root.selected-item < root.games.length;
+                    Text { text: "▶ LANCER AVEC UN ÉMULATEUR"; color: Theme.accent-cyan; font-size: 10px; font-weight: 700; vertical-alignment: center; horizontal-alignment: center; }
+                    TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            if (root.selected-item >= 0 && root.selected-item < root.games.length) {
+                                root.launch-game(root.games[root.selected-item].path, root.games[root.selected-item].system);
+                            }
+                        }
+                    }
+                }
+
+                Text { text: root.launch-status; color: Theme.text-muted; font-size: 10px; wrap: word-wrap; }
+            }
+        }
+    }
+}

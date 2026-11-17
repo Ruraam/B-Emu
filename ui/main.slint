@@ -1,0 +1,341 @@
+import { Theme, Motion } from "theme.slint";
+import { SidebarItem } from "components/sidebar-item.slint";
+import { StatusPill } from "components/status-pill.slint";
+import { NavAction, IndexedGame, SystemStat, EmulatorRow, CapabilityRow, BiosRow } from "models.slint";
+import { HomeScreen } from "screens/home.slint";
+import { SystemsScreen } from "screens/systems.slint";
+import { LibraryScreen } from "screens/library.slint";
+import { EmulatorsScreen } from "screens/emulators.slint";
+import { SettingsScreen } from "screens/settings.slint";
+
+export component MainWindow inherits Window {
+    // Navigation state. The Rust shell owns the transitions and writes these
+    // properties back; the screens only read them to draw focus states.
+    in-out property<int> active-page: 0;
+    in-out property<int> focused-page: 0;
+    in-out property<int> focus-zone: 0; // 0 = sidebar, 1 = content
+    in-out property<int> focused-item: 0;
+    in-out property<int> selected-item: -1;
+
+    // Local preferences (seeded by Rust, persisted in a later phase).
+    in-out property<bool> setting-auto-scan: true;
+    in-out property<bool> setting-vibration: true;
+    in-out property<bool> setting-reduced-motion: false;
+
+    // Data models supplied by the Rust services.
+    in property<[string]> pages;
+    in property<[IndexedGame]> last-played;
+    in property<[IndexedGame]> recent-games;
+    in property<[IndexedGame]> played-games;
+    in property<[IndexedGame]> library-games;
+    in property<[SystemStat]> systems;
+    in property<[EmulatorRow]> emulators;
+    in property<[CapabilityRow]> capabilities;
+    in property<[BiosRow]> bios;
+    in-out property<string> search-text: "";
+    in-out property<int> games-count: 0;
+    in-out property<int> systems-count: 0;
+    in-out property<int> duplicates-count: 0;
+    in-out property<int> favorites-count: 0;
+    in-out property<int> emulators-ready-count: 0;
+
+    // Library settings and scan state.
+    in property<[string]> game-dirs;
+    in property<[string]> system-rows;
+    in-out property<string> new-dir-text: "";
+    in-out property<string> scan-status: "Prêt";
+    in-out property<float> scan-progress: 0;
+    in-out property<bool> show-favorites-only: false;
+    in-out property<string> launch-status: "";
+
+    callback request-action(NavAction);
+    callback search-changed(string);
+    callback toggle-setting(int);
+    callback focus-sidebar();
+    callback focus-content();
+    callback set-motion-duration(duration);
+    callback add-dir(string);
+    callback remove-dir(int);
+    callback scan-now();
+    callback remove-focused-dir();
+    callback set-favorites-filter(bool);
+    callback toggle-favorite(string);
+    callback mark-played(string);
+    callback select-emulator(int);
+    callback toggle-capability(string);
+    callback launch-game(string, string);
+
+    remove-focused-dir() => { root.remove-dir(root.focused-item - 3); }
+
+    set-motion-duration(value) => { Motion.duration = value; }
+
+    forward-focus: navigation-focus;
+
+    title: "B-Emu";
+    min-width: 900px;
+    min-height: 560px;
+    preferred-width: 1100px;
+    preferred-height: 700px;
+    background: Theme.background;
+
+    HorizontalLayout {
+        spacing: 0px;
+
+        Rectangle {
+            width: 228px;
+            background: Theme.sidebar;
+            border-width: 0px;
+            border-color: Theme.border;
+
+            navigation-focus := FocusScope {
+                width: parent.width;
+                height: parent.height;
+
+                VerticalLayout {
+                    padding: 22px;
+                    spacing: 12px;
+
+                    Text {
+                        text: "B-Emu";
+                        color: Theme.accent-cyan;
+                        font-size: 30px;
+                        font-weight: 800;
+                    }
+
+                    Text {
+                        text: "EMULATION FRONTEND";
+                        color: Theme.accent-indigo;
+                        font-size: 10px;
+                        font-weight: 700;
+                        letter-spacing: 2px;
+                    }
+
+                    Rectangle {
+                        height: 1px;
+                        background: Theme.border;
+                    }
+
+                    Text {
+                        text: "NAVIGATION";
+                        color: Theme.text-muted;
+                        font-size: 10px;
+                        font-weight: 700;
+                        letter-spacing: 1.5px;
+                    }
+
+                    for page[i] in root.pages: SidebarItem {
+                        label: page;
+                        selected: root.active-page == i;
+                        focused: root.focus-zone == 0 && root.focused-page == i;
+                        activated => { root.open-page(i); }
+                        hovered => {
+                            if (root.active-page != i) {
+                                root.preview-page(i);
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        vertical-stretch: 1;
+                        background: transparent;
+                    }
+
+                    Text {
+                        text: "MANETTE / ↑ ↓ NAVIGUER  ·  A VALIDER  ·  B RETOUR";
+                        color: Theme.text-muted;
+                        font-size: 9px;
+                        letter-spacing: 0.5px;
+                        wrap: word-wrap;
+                    }
+
+                    Text {
+                        text: "PHASE 1 / APP SHELL";
+                        color: Theme.text-muted;
+                        font-size: 10px;
+                        letter-spacing: 1px;
+                    }
+
+                    Text {
+                        text: "Wayland native";
+                        color: Theme.accent-blue;
+                        font-size: 12px;
+                    }
+                }
+
+                key-pressed(event) => {
+                    root.focus-zone = 0;
+
+                    if (event.text == Key.DownArrow || event.text == Key.PageDown) {
+                        root.focused-page = Math.mod(root.focused-page + 1, root.pages.length);
+                        root.preview-page(root.focused-page);
+                        accept
+                    } else if (event.text == Key.UpArrow || event.text == Key.PageUp) {
+                        root.focused-page = Math.mod(root.focused-page - 1 + root.pages.length, root.pages.length);
+                        root.preview-page(root.focused-page);
+                        accept
+                    } else if (event.text == Key.Home) {
+                        root.focused-page = 0;
+                        root.preview-page(0);
+                        accept
+                    } else if (event.text == Key.End) {
+                        root.focused-page = Math.max(root.pages.length - 1, 0);
+                        root.preview-page(root.focused-page);
+                        accept
+                    } else if (event.text == Key.Return || event.text == Key.Space) {
+                        root.open-page(root.focused-page);
+                        accept
+                    } else {
+                        reject
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+            background: Theme.background-raised;
+
+            content-focus := FocusScope {
+                width: parent.width;
+                height: parent.height;
+
+                key-pressed(event) => {
+                    root.focus-zone = 1;
+
+                    if (event.text == Key.DownArrow || event.text == Key.PageDown) {
+                        root.request-action(NavAction.down);
+                        accept
+                    } else if (event.text == Key.UpArrow || event.text == Key.PageUp) {
+                        root.request-action(NavAction.up);
+                        accept
+                    } else if (event.text == Key.LeftArrow) {
+                        root.request-action(NavAction.left);
+                        accept
+                    } else if (event.text == Key.RightArrow) {
+                        root.request-action(NavAction.right);
+                        accept
+                    } else if (event.text == Key.Return || event.text == Key.Space) {
+                        root.request-action(NavAction.confirm);
+                        accept
+                    } else if (event.text == Key.Escape || event.text == Key.Backspace) {
+                        root.request-action(NavAction.back);
+                        accept
+                    } else if (event.text == "f" || event.text == "F") {
+                        root.request-action(NavAction.favorite);
+                        accept
+                    } else if (event.text == "p" || event.text == "P") {
+                        root.request-action(NavAction.played);
+                        accept
+                    } else {
+                        reject
+                    }
+                }
+
+                VerticalLayout {
+                    padding: 34px;
+                    spacing: 24px;
+
+                    Flickable {
+                        vertical-stretch: 1;
+
+                        VerticalLayout {
+                            spacing: 24px;
+
+                            if root.active-page == 0: HomeScreen {
+                        last-played: root.last-played;
+                        played-games: root.played-games;
+                        games-count: root.games-count;
+                        systems-count: root.systems-count;
+                        favorites-count: root.favorites-count;
+                        duplicates-count: root.duplicates-count;
+                        focused-item: root.focused-item;
+                        content-focused: root.focus-zone == 1;
+                    }
+
+                    if root.active-page == 1: SystemsScreen {
+                        systems: root.systems;
+                        focused-item: root.focused-item;
+                        content-focused: root.focus-zone == 1;
+                    }
+
+                    if root.active-page == 2: LibraryScreen {
+                        games: root.library-games;
+                        focused-item: root.focused-item;
+                        content-focused: root.focus-zone == 1;
+                        selected-item: root.selected-item;
+                        show-favorites-only: root.show-favorites-only;
+                        search-text: root.search-text;
+                        launch-status: root.launch-status;
+                        search-changed(text) => { root.search-changed(text); }
+                        set-favorites-filter(value) => { root.set-favorites-filter(value); }
+                        toggle-favorite(path) => { root.toggle-favorite(path); }
+                        mark-played(path) => { root.mark-played(path); }
+                        launch-game(path, system) => { root.launch-game(path, system); }
+                    }
+
+                    if root.active-page == 3: EmulatorsScreen {
+                        emulators: root.emulators;
+                        capabilities: root.capabilities;
+                        bios: root.bios;
+                        selected-item: root.selected-item;
+                        focused-item: root.focused-item;
+                        content-focused: root.focus-zone == 1;
+                        select-emulator(index) => { root.select-emulator(index); }
+                        toggle-capability(key) => { root.toggle-capability(key); }
+                    }
+
+                    if root.active-page == 4: SettingsScreen {
+                        auto-scan: root.setting-auto-scan;
+                        vibration: root.setting-vibration;
+                        reduced-motion: root.setting-reduced-motion;
+                        game-dirs: root.game-dirs;
+                        system-rows: root.system-rows;
+                        new-dir-text: root.new-dir-text;
+                        scan-status: root.scan-status;
+                        scan-progress: root.scan-progress;
+                        focused-item: root.focused-item;
+                        content-focused: root.focus-zone == 1;
+                        toggle-setting(index) => { root.toggle-setting(index); }
+                        add-dir(text) => { root.add-dir(text); }
+                        remove-dir(index) => { root.remove-dir(index); }
+                        scan-now() => { root.scan-now(); }
+                    }
+                        }
+                    }
+
+                    StatusPill {
+                        label: root.active-page == 2
+                            ? "↑ ↓ JEU  ·  F FAVORI  ·  P JOUÉ  ·  B RETOUR"
+                            : root.active-page == 4
+                                ? "↑ ↓ OPTION  ·  A VALIDER  ·  B RETOUR"
+                                : "↑ ↓ NAVIGUER  ·  A VALIDER  ·  B RETOUR";
+                        positive: true;
+                    }
+                }
+            }
+        }
+    }
+
+    // Shows a page while keeping keyboard focus in the sidebar: used by mouse
+    // hover and by Up/Down navigation so the user can keep browsing.
+    public function preview-page(page: int) {
+        if (root.active-page == page) {
+            return;
+        }
+        root.focused-page = page;
+        root.active-page = page;
+        root.focused-item = 0;
+        root.selected-item = -1;
+    }
+
+    // Shared by sidebar clicks and keyboard activation so mouse, keyboard and
+    // gamepad always produce the same navigation state.
+    public function open-page(page: int) {
+        root.focused-page = page;
+        root.active-page = page;
+        root.focus-zone = 1;
+        root.focused-item = 0;
+        root.selected-item = -1;
+        root.focus-content();
+    }
+}

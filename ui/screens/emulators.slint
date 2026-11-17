@@ -1,0 +1,130 @@
+import { Theme } from "../theme.slint";
+import { GlassPanel } from "../components/glass-panel.slint";
+import { PageHeader } from "../components/page-header.slint";
+import { ListRow } from "../components/list-row.slint";
+import { StatusPill } from "../components/status-pill.slint";
+import { EmulatorRow, CapabilityRow, BiosRow } from "../models.slint";
+
+export component EmulatorsScreen inherits VerticalLayout {
+    in property<[EmulatorRow]> emulators;
+    in property<[CapabilityRow]> capabilities;
+    in property<[BiosRow]> bios;
+    in property<int> focused-item: 0;
+    in property<bool> content-focused: false;
+    in property<int> selected-item: -1;
+    callback select-emulator(int);
+    callback toggle-capability(string);
+
+    spacing: 16px;
+
+    PageHeader {
+        eyebrow: "B-EMU / ÉMULATEURS";
+        title: "Émulateurs";
+        subtitle: "Émulateurs détectés sur le PATH. Seuls les réglages déclarés par l'adaptateur sont proposés.";
+    }
+
+    HorizontalLayout {
+        spacing: 16px;
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 8px;
+
+            Text { text: "DÉTECTÉS"; color: Theme.text-muted; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
+
+            if root.emulators.length == 0: GlassPanel {
+                vertical-stretch: 1;
+                Text {
+                    text: "Aucun émulateur détecté. Installez RetroArch, Dolphin, PCSX2, PPSSPP ou MAME, puis redémarrez B-Emu.";
+                    color: Theme.text-secondary;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+            }
+
+            for emulator[i] in root.emulators: ListRow {
+                focused: root.content-focused && root.focused-item == i;
+                selected: root.selected-item == i;
+                activated => { root.select-emulator(i); }
+
+                Rectangle {
+                    width: 4px;
+                    height: 26px;
+                    border-radius: 2px;
+                    background: emulator.ready ? Theme.accent-cyan : Theme.text-muted;
+                }
+
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 2px;
+                    Text { text: emulator.name; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
+                    Text { text: emulator.systems; color: Theme.text-secondary; font-size: 10px; overflow: elide; }
+                }
+
+                Text { text: emulator.version; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                StatusPill { label: emulator.status; positive: emulator.ready; }
+            }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 10px;
+
+            GlassPanel {
+                vertical-stretch: 1;
+
+                Text { text: "DÉTAILS"; color: Theme.accent-indigo; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
+
+                Text {
+                    text: root.selected-item >= 0 && root.selected-item < root.emulators.length ? root.emulators[root.selected-item].name : "Aucun émulateur sélectionné";
+                    color: Theme.text-primary;
+                    font-size: 20px;
+                    font-weight: 700;
+                }
+
+                Text {
+                    text: root.selected-item >= 0 && root.selected-item < root.emulators.length ? "Version " + root.emulators[root.selected-item].version : "Choisissez un émulateur.";
+                    color: Theme.accent-blue;
+                    font-size: 12px;
+                }
+
+                Text { text: "BIOS / FIRMWARE"; color: Theme.text-muted; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; }
+
+                if root.bios.length == 0: Text {
+                    text: "Aucun BIOS requis déclaré.";
+                    color: Theme.text-muted;
+                    font-size: 11px;
+                }
+
+                for item in root.bios: HorizontalLayout {
+                    spacing: 8px;
+                    Text { text: item.present ? "✓" : "✗"; color: item.present ? Theme.accent-cyan : #F87171; font-size: 13px; }
+                    Text { text: item.name; color: Theme.text-primary; font-size: 11px; horizontal-stretch: 1; }
+                    Text { text: item.present ? "présent" : "manquant"; color: item.present ? Theme.accent-cyan : Theme.text-muted; font-size: 10px; }
+                }
+
+                Rectangle { height: 1px; background: Theme.border; }
+
+                Text { text: "REGLAGES DÉCLARÉS"; color: Theme.text-muted; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; }
+
+                if root.capabilities.length == 0: Text {
+                    text: "Aucun réglage exposé par cet adaptateur.";
+                    color: Theme.text-muted;
+                    font-size: 11px;
+                }
+
+                for capability[i] in root.capabilities: ListRow {
+                    focused: root.content-focused && root.focused-item == root.emulators.length + i;
+                    selected: false;
+                    activated => { root.toggle-capability(capability.key); }
+                    Text { text: capability.label; color: Theme.text-primary; font-size: 13px; horizontal-stretch: 1; }
+                    Text { text: capability.flag; color: Theme.text-muted; font-size: 10px; }
+                    Text { text: capability.enabled ? "●" : "○"; color: capability.enabled ? Theme.accent-cyan : Theme.text-muted; font-size: 16px; }
+                }
+
+                Rectangle { vertical-stretch: 1; background: transparent; }
+            }
+        }
+    }
+
+}

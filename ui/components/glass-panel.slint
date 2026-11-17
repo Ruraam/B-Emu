@@ -1,0 +1,24 @@
+import { Theme, Motion } from "../theme.slint";
+
+export component GlassPanel inherits Rectangle {
+    in property<length> panel-padding: 22px;
+    in property<length> panel-spacing: 12px;
+    in property<bool> focused: false;
+    in property<bool> selected: false;
+
+    background: root.focused ? Theme.panel-raised : Theme.panel;
+    border-radius: 18px;
+    border-width: root.focused ? 2px : 1px;
+    border-color: root.focused ? Theme.accent-cyan : (root.selected ? Theme.border-highlight : Theme.border);
+
+    animate border-color, background {
+        duration: Motion.duration;
+        easing: ease-in-out;
+    }
+
+    VerticalLayout {
+        padding: root.panel-padding;
+        spacing: root.panel-spacing;
+        @children
+    }
+}

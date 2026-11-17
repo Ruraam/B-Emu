@@ -1,0 +1,52 @@
+import { Theme } from "../theme.slint";
+
+export component SidebarItem inherits Rectangle {
+    in property<string> label: "";
+    in property<bool> selected: false;
+    in property<bool> focused: false;
+    callback activated();
+    callback hovered();
+
+    height: 46px;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: root.focused ? Theme.border-highlight : (root.selected ? Theme.border : transparent);
+    background: root.selected ? Theme.sidebar-selected : (root.focused ? Theme.sidebar-focus : Theme.sidebar);
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 12px;
+        spacing: 10px;
+        alignment: center;
+
+        Rectangle {
+            width: 4px;
+            height: 18px;
+            border-radius: 2px;
+            background: root.selected ? Theme.accent-cyan : transparent;
+        }
+
+        Text {
+            text: root.label;
+            color: root.selected ? Theme.accent-cyan : Theme.text-secondary;
+            font-size: 14px;
+            font-weight: root.selected ? 700 : 500;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+        }
+    }
+
+    TouchArea {
+        mouse-cursor: pointer;
+
+        clicked => {
+            root.activated();
+        }
+
+        changed has-hover => {
+            if (self.has-hover) {
+                root.hovered();
+            }
+        }
+    }
+}

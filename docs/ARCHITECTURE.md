@@ -19,10 +19,14 @@ Explicit non-goals:
 - No Windows or macOS target in the initial architecture.
 - No Kodi integration.
 - No modifications to BubbleOS, BubbleTerm, or BubbleWM.
+- No dependency on BubbleWM IPC, BubbleOS services, or compositor-private protocols for normal application operation.
+- No privileged installation, system daemon, setuid helper, or root requirement.
 - No shared theme/runtime repository requirement.
 - No invented emulator settings: each integration exposes only settings supported by the detected emulator and version.
 
 B-Emu may use BubbleOS artwork as a visual reference for its own palette. This is a design choice, not a technical dependency.
+
+B-Emu is a standard Wayland client. BubbleWM is a first-class development and validation environment, but any compatible Wayland compositor must be able to host the same standalone application build. The rootless installation, XDG data locations, and ULPM `.lpk` release contract are defined in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## 2. High-level components
 
@@ -122,7 +126,7 @@ This is a proposed boundary map, not a commitment to create every crate immediat
 
 ## 6. Library and persistence
 
-SQLite is the initial local index. It stores game records, detected systems, emulator associations, play history, and metadata references.
+SQLite is the initial local index. It stores game records, detected systems, emulator associations, play history, and metadata references. The Phase 2 implementation and its safety rules are documented in [PHASE-2.md](PHASE-2.md).
 
 ROM and disc image files remain in the user's chosen directories. B-Emu indexes them; it does not silently move or rewrite them.
 
@@ -150,21 +154,17 @@ Every emulator adapter should report:
 
 Settings are capability-driven. An adapter must not expose a setting unless it can verify that the installed emulator version supports it. Unknown settings remain hidden rather than guessed.
 
-The first adapters should be selected based on availability and testability on Debian-based Linux, then expanded.
+The first adapters should be selected based on availability and testability on Debian-based Linux, then expanded. The Phase 3 implementation is documented in [PHASE-3.md](PHASE-3.md).
 
 ## 8. Controller and mouse input
 
 The interface is controller-first but remains fully usable with a mouse and keyboard.
 
-The input service owns:
+The input service owns controller discovery and hotplug through GilRs, button/axis normalization, and controller disconnect handling. Polling runs on a dedicated thread and reaches Slint only through `Weak::upgrade_in_event_loop`; the UI thread is never blocked by evdev polling. The worker is stopped and joined when the main window exits.
 
-- Controller discovery and hotplug.
-- Button and axis mapping.
-- Configurable navigation bindings.
-- Focus movement and activation.
-- Clear handling of controller disconnects.
+The current shell maps vertical navigation, confirm, and back-to-home. Horizontal actions are normalized for later screens but do not change the vertical sidebar. Analog navigation uses activation and return thresholds to avoid jitter.
 
-Input events are translated into application-level actions so that the UI is not tied to a specific controller model.
+Access remains rootless and follows the active Linux seat/session ACL policy. B-Emu never changes `/dev/input` permissions, adds the user to the `input` group, or requests root. If access is unavailable, the gamepad worker reports it and keyboard/mouse input remains available. See [GAMEPAD.md](GAMEPAD.md) for the mapping and runtime details.
 
 ## 9. Visual direction
 
@@ -223,7 +223,8 @@ Use restrained glass surfaces, readable typography, clear focus states, and moti
 - Wayland-only build verification.
 - Crash-safe database updates.
 - Security review of process launch and file handling.
-- Packaging for Linux distributions.
+- Build, sign, install, update, roll back, and uninstall architecture-specific ULPM `.lpk` packages without root.
+- Validate the same package on BubbleWM and at least one independent Wayland compositor.
 
 ## 11. Architecture acceptance criteria
 
@@ -236,3 +237,11 @@ The architecture is not considered validated until:
 5. Renderer selection and fallback are observable in logs.
 6. The UI can be navigated without a mouse.
 7. A fake/test emulator adapter can be launched safely without shell command concatenation.
+
+## 12. BubbleWM and deployment independence
+
+- B-Emu communicates with the compositor through standard Wayland client protocols provided by its Wayland backend.
+- Do not add a dependency on the BubbleWM workspace IPC crate for window creation, input, focus, or rendering.
+- BubbleWM may be used for nested development and integration tests, but it is not required at build time or runtime.
+- All mutable application state belongs in user-owned XDG directories; the executable and packaged payload must be treated as read-only.
+- ULPM packaging is a release target, not a dependency of the development binary. The exact package manifest and permission declarations must be validated against the target ULPM implementation before release.
