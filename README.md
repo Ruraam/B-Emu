@@ -32,6 +32,11 @@ metadata with provenance, a sidecar artwork cache and BIOS/firmware validation.
 Phase 5 persists preferences, applies scans transactionally, validates launch
 paths before starting an emulator, and produces a signed rootless ULPM `.lpk`.
 
+Release artifacts are built with `bash scripts/release-lpk.sh` (signed `.lpk`
+plus a minimal signed repository); `bash scripts/smoke-wayland.sh` runs the
+headless startup test for the binary or the package, with a parametrizable
+compositor command.
+
 CI validates formatting, the Wayland-only dependency graph, the Linux build,
 unit tests, and a headless Weston startup smoke test. See
 [docs/PHASE-5.md](docs/PHASE-5.md) for hardening,

@@ -74,7 +74,40 @@ ulpm run target/b-emu_amd64.lpk
 The smoke test starts the packaged application under a headless Wayland
 compositor inside the Bubblewrap sandbox and verifies that it stays running.
 
-## Remaining for release
+## Signed repository
 
-- Validation on BubbleWM and at least one independent Wayland compositor.
-- Distribution of the release public key through the repository index.
+`scripts/release-lpk.sh` builds the package, generates a stable release key in
+`target/release-keys/` (isolated XDG environment: the user's ULPM config is
+never touched), re-signs the package, and creates a minimal signed repository
+in `target/repo/`:
+
+```text
+target/repo/
+  b-emu_amd64.lpk
+  index.json
+  index.json.sig
+  release_key.pub
+```
+
+The publisher public key must be distributed out of band; `ulpm repo add` pins
+its fingerprint. Verified locally: package signature valid, repository index
+verified (`ulpm repo verify`), and the packaged application started through
+`ulpm run` inside the Bubblewrap sandbox.
+
+## Compositor validation matrix
+
+`scripts/smoke-wayland.sh` runs a headless startup test and accepts any
+compositor command through `COMPOSITOR_CMD`. It was executed locally with
+Weston for both the development binary and the packaged `.lpk`, and both stayed
+running for the full smoke window.
+
+| Environment | Status |
+| :--- | :--- |
+| Weston (headless, pixman), development binary | validated |
+| Weston (headless, pixman), packaged `.lpk` in Bubblewrap | validated |
+| BubbleWM | not available in this environment |
+| A second independent compositor | not available in this environment |
+
+To complete the release matrix, run the same script on the target compositors,
+for example with `COMPOSITOR_CMD='bubblewm ...' TARGET=lpk bash
+scripts/smoke-wayland.sh`.
