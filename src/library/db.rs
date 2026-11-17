@@ -78,9 +78,13 @@ fn all_paths_on(conn: &Connection) -> Result<Vec<PathBuf>, rusqlite::Error> {
     rows.map(|row| row.map(PathBuf::from)).collect()
 }
 
-fn remove_missing_on(conn: &Connection, seen: &HashSet<PathBuf>) -> Result<usize, rusqlite::Error> {
+fn remove_paths_on(
+    conn: &Connection,
+    paths: impl IntoIterator<Item = PathBuf>,
+    seen: &HashSet<PathBuf>,
+) -> Result<usize, rusqlite::Error> {
     let mut removed = 0;
-    for path in all_paths_on(conn)? {
+    for path in paths {
         if !seen.contains(&path) {
             let key = path.to_string_lossy();
             let key = key.as_ref();
@@ -90,6 +94,32 @@ fn remove_missing_on(conn: &Connection, seen: &HashSet<PathBuf>) -> Result<usize
         }
     }
     Ok(removed)
+}
+
+fn remove_missing_on(conn: &Connection, seen: &HashSet<PathBuf>) -> Result<usize, rusqlite::Error> {
+    remove_paths_on(conn, all_paths_on(conn)?, seen)
+}
+
+/// Prune only entries owned by roots whose scan completed without errors.
+/// Matching the stored source directory exactly prevents a successful parent
+/// root from pruning entries belonging to a separately configured child root.
+fn remove_missing_from_roots_on(
+    conn: &Connection,
+    seen: &HashSet<PathBuf>,
+    completed_roots: &[PathBuf],
+) -> Result<usize, rusqlite::Error> {
+    let mut statement = conn.prepare("SELECT path, source_dir FROM games")?;
+    let rows = statement.query_map([], |row| {
+        Ok((PathBuf::from(row.get::<_, String>(0)?), PathBuf::from(row.get::<_, String>(1)?)))
+    })?;
+    let mut candidates = Vec::new();
+    for row in rows {
+        let (path, source_dir) = row?;
+        if completed_roots.iter().any(|root| root == &source_dir) {
+            candidates.push(path);
+        }
+    }
+    remove_paths_on(conn, candidates, seen)
 }
 
 impl LibraryDb {
@@ -188,17 +218,13 @@ impl LibraryDb {
         &mut self,
         games: &[(ScannedGame, ScanOutcome)],
         seen: &HashSet<PathBuf>,
-        prune: bool,
+        completed_roots: &[PathBuf],
     ) -> Result<usize, rusqlite::Error> {
         let transaction = self.conn.transaction()?;
         for (game, _) in games {
             upsert_on(&transaction, game)?;
         }
-        let removed = if prune {
-            remove_missing_on(&transaction, seen)?
-        } else {
-            0
-        };
+        let removed = remove_missing_from_roots_on(&transaction, seen, completed_roots)?;
         transaction.commit()?;
         Ok(removed)
     }
@@ -427,7 +453,7 @@ impl LibraryDb {
 mod tests {
     use super::LibraryDb;
     use crate::library::scanner::{ScanOutcome, ScannedGame};
-    use std::collections::HashSet;
+    use std::{collections::HashSet, path::PathBuf};
 
     fn game(name: &str, system: &str, checksum: &str) -> ScannedGame {
         ScannedGame {
@@ -493,12 +519,43 @@ mod tests {
         let entry = game("a.nes", "NES", "a");
         let seen = HashSet::from([entry.path.clone()]);
 
-        db.apply_scan(&[(entry, ScanOutcome::Added)], &seen, false)
+        db.apply_scan(&[(entry, ScanOutcome::Added)], &seen, &[])
             .unwrap();
         assert_eq!(db.games().unwrap().len(), 1);
 
-        db.apply_scan(&[], &HashSet::new(), true).unwrap();
+        db.apply_scan(&[], &HashSet::new(), &[PathBuf::from("/roms")]).unwrap();
         assert!(db.games().unwrap().is_empty());
+    }
+
+    #[test]
+    fn scoped_pruning_preserves_entries_from_unavailable_roots() {
+        let mut db = LibraryDb::open_in_memory().unwrap();
+        let available = game("available.nes", "NES", "a");
+        let unavailable = ScannedGame {
+            path: "/external/missing.sfc".into(),
+            title: "missing".into(),
+            system: "Super Nintendo".into(),
+            size: 42,
+            modified_ns: 1,
+            checksum: "b".into(),
+            source_dir: "/external".into(),
+        };
+        db.upsert(&available).unwrap();
+        db.upsert(&unavailable).unwrap();
+        db.toggle_favorite("/external/missing.sfc").unwrap();
+        db.mark_played("/external/missing.sfc").unwrap();
+
+        let seen = HashSet::from([available.path.clone()]);
+        let removed = db.apply_scan(
+            &[(available, ScanOutcome::Unchanged)],
+            &seen,
+            &[PathBuf::from("/roms")],
+        ).unwrap();
+
+        assert_eq!(removed, 0);
+        assert_eq!(db.games().unwrap().len(), 2);
+        assert!(db.favorite_paths().unwrap().contains("/external/missing.sfc"));
+        assert_eq!(db.recently_played(10).unwrap().len(), 1);
     }
 
     #[test]
