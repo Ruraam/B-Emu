@@ -168,12 +168,16 @@ impl LibraryDb {
         rows.collect()
     }
 
+    // Convenience APIs kept for callers that index a single game outside a
+    // full scan (and used by unit tests); scans use the transactional path.
+    #[allow(dead_code)]
     pub fn upsert(&self, game: &ScannedGame) -> Result<(), rusqlite::Error> {
         upsert_on(&self.conn, game)
     }
 
     /// Removes rows that were not seen during a completed scan. This covers
     /// deleted files and directories removed from the configuration.
+    #[allow(dead_code)]
     pub fn remove_missing(&self, seen: &HashSet<PathBuf>) -> Result<usize, rusqlite::Error> {
         remove_missing_on(&self.conn, seen)
     }
