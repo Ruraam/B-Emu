@@ -287,13 +287,17 @@ mod tests {
         fs::write(&path, b"rom").unwrap();
 
         let mut library = Library::open_in_memory().unwrap();
-        library.scan(&[roms.clone()], &AtomicBool::new(false), &mut |_| {}).unwrap();
+        library
+            .scan(&[roms.clone()], &AtomicBool::new(false), &mut |_| {})
+            .unwrap();
         let key = path.to_string_lossy().to_string();
         library.toggle_favorite(&key).unwrap();
         library.mark_played(&key).unwrap();
 
         fs::set_permissions(&blocked, fs::Permissions::from_mode(0o000)).unwrap();
-        let report = library.scan(&[roms], &AtomicBool::new(false), &mut |_| {}).unwrap();
+        let report = library
+            .scan(&[roms], &AtomicBool::new(false), &mut |_| {})
+            .unwrap();
         fs::set_permissions(&blocked, fs::Permissions::from_mode(0o755)).unwrap();
 
         assert!(report.errors > 0);
