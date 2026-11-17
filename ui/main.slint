@@ -1,5 +1,6 @@
 import { Theme, Motion } from "theme.slint";
 import { SidebarItem } from "components/sidebar-item.slint";
+import { StatusPill } from "components/status-pill.slint";
 import { NavAction, IndexedGame, SystemStat, EmulatorRow, CapabilityRow, BiosRow } from "models.slint";
 import { HomeScreen } from "screens/home.slint";
 import { SystemsScreen } from "screens/systems.slint";
@@ -129,7 +130,7 @@ export component MainWindow inherits Window {
                         activated => { root.open-page(i); }
                         hovered => {
                             if (root.active-page != i) {
-                                root.open-page(i);
+                                root.preview-page(i);
                             }
                         }
                     }
@@ -166,15 +167,19 @@ export component MainWindow inherits Window {
 
                     if (event.text == Key.DownArrow || event.text == Key.PageDown) {
                         root.focused-page = Math.mod(root.focused-page + 1, root.pages.length);
+                        root.preview-page(root.focused-page);
                         accept
                     } else if (event.text == Key.UpArrow || event.text == Key.PageUp) {
                         root.focused-page = Math.mod(root.focused-page - 1 + root.pages.length, root.pages.length);
+                        root.preview-page(root.focused-page);
                         accept
                     } else if (event.text == Key.Home) {
                         root.focused-page = 0;
+                        root.preview-page(0);
                         accept
                     } else if (event.text == Key.End) {
                         root.focused-page = Math.max(root.pages.length - 1, 0);
+                        root.preview-page(root.focused-page);
                         accept
                     } else if (event.text == Key.Return || event.text == Key.Space) {
                         root.open-page(root.focused-page);
@@ -297,9 +302,30 @@ export component MainWindow inherits Window {
                     }
                         }
                     }
+
+                    StatusPill {
+                        label: root.active-page == 2
+                            ? "↑ ↓ JEU  ·  F FAVORI  ·  P JOUÉ  ·  B RETOUR"
+                            : root.active-page == 4
+                                ? "↑ ↓ OPTION  ·  A VALIDER  ·  B RETOUR"
+                                : "↑ ↓ NAVIGUER  ·  A VALIDER  ·  B RETOUR";
+                        positive: true;
+                    }
                 }
             }
         }
+    }
+
+    // Shows a page while keeping keyboard focus in the sidebar: used by mouse
+    // hover and by Up/Down navigation so the user can keep browsing.
+    public function preview-page(page: int) {
+        if (root.active-page == page) {
+            return;
+        }
+        root.focused-page = page;
+        root.active-page = page;
+        root.focused-item = 0;
+        root.selected-item = -1;
     }
 
     // Shared by sidebar clicks and keyboard activation so mouse, keyboard and

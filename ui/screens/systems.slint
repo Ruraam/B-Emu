@@ -1,7 +1,6 @@
 import { Theme } from "../theme.slint";
 import { GlassPanel } from "../components/glass-panel.slint";
 import { PageHeader } from "../components/page-header.slint";
-import { StatusPill } from "../components/status-pill.slint";
 import { SystemStat } from "../models.slint";
 
 component SystemTile inherits GlassPanel {
@@ -82,5 +81,4 @@ export component SystemsScreen inherits VerticalLayout {
         background: transparent;
     }
 
-    StatusPill { label: "↑ ↓ SYSTÈME  ·  A SÉLECTIONNER  ·  B RETOUR"; positive: true; }
 }

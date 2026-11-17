@@ -2,7 +2,6 @@ import { Theme, Motion } from "../theme.slint";
 import { GlassPanel } from "../components/glass-panel.slint";
 import { PageHeader } from "../components/page-header.slint";
 import { ListRow } from "../components/list-row.slint";
-import { StatusPill } from "../components/status-pill.slint";
 
 component Toggle inherits Rectangle {
     in property<bool> on: false;
@@ -48,7 +47,7 @@ export component SettingsScreen inherits VerticalLayout {
     callback remove-dir(int);
     callback scan-now();
 
-    spacing: 14px;
+    spacing: 10px;
 
     PageHeader {
         eyebrow: "B-EMU / PARAMÈTRES";
@@ -62,14 +61,14 @@ export component SettingsScreen inherits VerticalLayout {
 
             VerticalLayout {
                 horizontal-stretch: 3;
-                spacing: 12px;
+                spacing: 8px;
 
                 Text { text: "PRÉFÉRENCES"; color: Theme.accent-indigo; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
 
                 GlassPanel {
                     horizontal-stretch: 1;
                     panel-padding: 10px;
-                    panel-spacing: 8px;
+                    panel-spacing: 6px;
 
                     ListRow {
                         focused: root.content-focused && root.focused-item == 0;
@@ -116,7 +115,7 @@ export component SettingsScreen inherits VerticalLayout {
                 GlassPanel {
                     horizontal-stretch: 1;
                     panel-padding: 12px;
-                    panel-spacing: 8px;
+                    panel-spacing: 6px;
 
                     if root.game-dirs.length == 0: Text {
                         text: "Aucun dossier configuré. Ajoutez-en un ci-dessous pour commencer.";
@@ -170,14 +169,14 @@ export component SettingsScreen inherits VerticalLayout {
                         focused: root.content-focused && root.focused-item == 3 + root.game-dirs.length;
                         selected: root.focused-item == 3 + root.game-dirs.length;
                         activated => { root.pending-remove = -1; root.add-dir(root.new-dir-text); }
-                        Text { text: "AJOUTER LE DOSSIER"; color: Theme.accent-cyan; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+                        Text { text: "AJOUTER LE DOSSIER"; color: Theme.accent-cyan; font-size: 11px; font-weight: 700; letter-spacing: 1px; vertical-alignment: center; horizontal-alignment: center; }
                     }
 
                     ListRow {
                         focused: root.content-focused && root.focused-item == 4 + root.game-dirs.length;
                         selected: root.focused-item == 4 + root.game-dirs.length;
                         activated => { root.pending-remove = -1; root.scan-now(); }
-                        Text { text: "ANALYSER MAINTENANT"; color: Theme.accent-blue; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+                        Text { text: "ANALYSER MAINTENANT"; color: Theme.accent-blue; font-size: 11px; font-weight: 700; letter-spacing: 1px; vertical-alignment: center; horizontal-alignment: center; }
                     }
 
                     Rectangle {
@@ -199,11 +198,11 @@ export component SettingsScreen inherits VerticalLayout {
 
             VerticalLayout {
                 horizontal-stretch: 2;
-                spacing: 12px;
+                spacing: 8px;
 
                 GlassPanel {
                     panel-padding: 12px;
-                    panel-spacing: 8px;
+                    panel-spacing: 6px;
                     Text { text: "SYSTÈME"; color: Theme.accent-indigo; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
                     for row in root.system-rows: Text { text: row; color: Theme.text-secondary; font-size: 11px; wrap: word-wrap; }
                 }
@@ -221,5 +220,4 @@ export component SettingsScreen inherits VerticalLayout {
             }
     }
 
-    StatusPill { label: "↑ ↓ OPTION  ·  A VALIDER  ·  B RETOUR"; positive: true; }
 }

@@ -145,6 +145,21 @@ fn apply_nav_action(
 
     let mut next = apply_action(state, gamepad_action, item_count(window));
 
+    // In the sidebar, moving the highlight previews the page immediately,
+    // like mouse hover. A is still required to move focus into the content.
+    if old_zone == FocusZone::Sidebar
+        && matches!(
+            gamepad_action,
+            GamepadAction::NavigateUp | GamepadAction::NavigateDown
+        )
+    {
+        next.active_page = next.focused_page;
+    }
+    if next.active_page != window.get_active_page() {
+        next.focused_item = 0;
+        next.selected_item = -1;
+    }
+
     // Capability settings follow the emulator rows in the Emulators screen.
     if next.active_page == 3
         && next.zone == FocusZone::Content
