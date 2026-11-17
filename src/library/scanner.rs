@@ -241,12 +241,7 @@ mod tests {
             .join(std::ffi::OsString::from_vec(b"roms-\xff".to_vec()));
         fs::create_dir(&root).unwrap();
 
-        let result = scan_root(
-            &root,
-            &HashMap::new(),
-            &AtomicBool::new(false),
-            &mut |_| {},
-        );
+        let result = scan_root(&root, &HashMap::new(), &AtomicBool::new(false), &mut |_| {});
 
         assert_eq!(result.errors, 1);
         assert!(result.games.is_empty());
