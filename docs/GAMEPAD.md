@@ -31,9 +31,22 @@ Analog directions use a 0.65 activation threshold and 0.35 return threshold
 to reduce jitter. Direction changes are emitted once per threshold transition,
 not continuously while an axis is held.
 
-The current application shell has a vertical sidebar. Therefore left/right
-actions are normalized now but intentionally do not alter the sidebar state;
-they can be consumed by later screens with horizontal navigation.
+## Focus model
+
+The shell has two focus zones: the sidebar and the content area.
+
+- In the sidebar, up/down moves the highlighted page and Confirm opens it.
+  Back returns to Home. Left/right actions are normalized but intentionally do
+  not alter the vertical sidebar.
+- In a screen, up/down moves the highlighted item (wrapping around), Confirm
+  selects it, and Back returns focus to the sidebar without leaving the page.
+  Settings toggles the focused row on Confirm.
+- Moving between zones also moves Slint's real keyboard focus, so mouse,
+  keyboard and gamepad input all drive the same state.
+
+The pure transition function lives in `input::navigation` and is unit-tested
+without a window. The gamepad worker forwards normalized actions to Slint,
+which calls back into that same function through one shared navigation path.
 
 ## Permissions and rootless operation
 

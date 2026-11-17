@@ -20,7 +20,16 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the architecture and [docs/
 
 ## Status
 
-Phase 0 prototype is in progress on the `phase-0-wayland-prototype` branch. CI is being used to validate the Wayland-only dependency graph and Linux build before the full interface is developed.
+Phase 0 validated the Wayland-only build and startup policy. Phase 1 is in
+progress on the `phase-1-*` branches: the shell now has five data-driven screens
+(Home, Systems, Library, Emulators, Settings) with a unified keyboard, mouse and
+gamepad focus model. The screens are seeded from typed Rust view models in
+`src/shell.rs`; real library scanning and emulator detection arrive in Phases 2
+and 3.
 
+CI validates formatting, the Wayland-only dependency graph, the Linux build,
+unit tests, and a headless Weston startup smoke test. See [docs/GAMEPAD.md](docs/GAMEPAD.md)
+for the input model and [docs/PHASE-0.md](docs/PHASE-0.md) for the renderer and
+Wayland policy.
 
 Deployment requirements and the planned rootless ULPM `.lpk` distribution model are documented in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
