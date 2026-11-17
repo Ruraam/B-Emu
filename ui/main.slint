@@ -127,6 +127,11 @@ export component MainWindow inherits Window {
                         selected: root.active-page == i;
                         focused: root.focus-zone == 0 && root.focused-page == i;
                         activated => { root.open-page(i); }
+                        hovered => {
+                            if (root.active-page != i) {
+                                root.open-page(i);
+                            }
+                        }
                     }
 
                     Rectangle {
@@ -225,7 +230,13 @@ export component MainWindow inherits Window {
                     padding: 34px;
                     spacing: 24px;
 
-                    if root.active-page == 0: HomeScreen {
+                    Flickable {
+                        vertical-stretch: 1;
+
+                        VerticalLayout {
+                            spacing: 24px;
+
+                            if root.active-page == 0: HomeScreen {
                         last-played: root.last-played;
                         played-games: root.played-games;
                         games-count: root.games-count;
@@ -283,6 +294,8 @@ export component MainWindow inherits Window {
                         add-dir(text) => { root.add-dir(text); }
                         remove-dir(index) => { root.remove-dir(index); }
                         scan-now() => { root.scan-now(); }
+                    }
+                        }
                     }
                 }
             }

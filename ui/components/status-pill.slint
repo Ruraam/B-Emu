@@ -4,23 +4,25 @@ export component StatusPill inherits Rectangle {
     in property<string> label: "";
     in property<bool> positive: true;
 
-    height: 24px;
-    border-radius: 12px;
-    background: root.positive ? #12304A : #2A1D33;
+    height: 28px;
+    border-radius: 14px;
+    background: root.positive ? Theme.sidebar-selected : Theme.panel;
     border-width: 1px;
-    border-color: root.positive ? Theme.border-highlight : #6B4A6B;
+    border-color: root.positive ? Theme.border-highlight : Theme.border;
 
     HorizontalLayout {
-        padding-left: 10px;
-        padding-right: 10px;
+        padding-left: 16px;
+        padding-right: 16px;
+        alignment: center;
 
         Text {
             text: root.label;
             color: root.positive ? Theme.accent-cyan : Theme.text-secondary;
             font-size: 10px;
             font-weight: 700;
-            letter-spacing: 0.8px;
+            letter-spacing: 1px;
             vertical-alignment: center;
+            horizontal-alignment: center;
         }
     }
 }

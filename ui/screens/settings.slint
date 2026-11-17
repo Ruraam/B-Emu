@@ -1,4 +1,4 @@
-import { Theme } from "../theme.slint";
+import { Theme, Motion } from "../theme.slint";
 import { GlassPanel } from "../components/glass-panel.slint";
 import { PageHeader } from "../components/page-header.slint";
 import { ListRow } from "../components/list-row.slint";
@@ -12,6 +12,10 @@ component Toggle inherits Rectangle {
     border-radius: 11px;
     background: root.on ? Theme.accent-cyan : Theme.border;
 
+    animate background {
+        duration: Motion.duration;
+    }
+
     Rectangle {
         x: root.on ? 22px : 3px;
         y: 3px;
@@ -19,6 +23,10 @@ component Toggle inherits Rectangle {
         height: 16px;
         border-radius: 8px;
         background: root.on ? #020617 : Theme.text-secondary;
+
+        animate x, background {
+            duration: Motion.duration;
+        }
     }
 }
 
@@ -48,11 +56,8 @@ export component SettingsScreen inherits VerticalLayout {
         subtitle: "Préférences et bibliothèque. Tout est enregistré dans les répertoires XDG.";
     }
 
-    Flickable {
+    HorizontalLayout {
         vertical-stretch: 1;
-
-        HorizontalLayout {
-            width: parent.width;
             spacing: 16px;
 
             VerticalLayout {
@@ -214,7 +219,6 @@ export component SettingsScreen inherits VerticalLayout {
 
                 Rectangle { vertical-stretch: 1; background: transparent; }
             }
-        }
     }
 
     StatusPill { label: "↑ ↓ OPTION  ·  A VALIDER  ·  B RETOUR"; positive: true; }

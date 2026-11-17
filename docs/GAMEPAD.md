@@ -52,6 +52,9 @@ The shell has two focus zones: the sidebar and the content area.
   Settings toggles the focused row on Confirm.
 - Moving between zones also moves Slint's real keyboard focus, so mouse,
   keyboard and gamepad input all drive the same state.
+- With a mouse, hovering a sidebar entry opens that page directly; clicking
+  and A still work. Every screen lives inside a scrollable viewport, so long
+  content stays reachable on small windows.
 
 The pure transition function lives in `input::navigation` and is unit-tested
 without a window. The gamepad worker forwards normalized actions to Slint,
