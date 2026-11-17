@@ -32,6 +32,10 @@ metadata with provenance, a sidecar artwork cache and BIOS/firmware validation.
 Phase 5 persists preferences, applies scans transactionally, validates launch
 paths before starting an emulator, and produces a signed rootless ULPM `.lpk`.
 
+To try the shell with a non-empty library, run `bash scripts/prepare-demo.sh`:
+it creates isolated XDG directories with a few dummy games and prints the
+environment variables and command to launch B-Emu.
+
 Release artifacts are built with `bash scripts/release-lpk.sh` (signed `.lpk`
 plus a minimal signed repository); `bash scripts/smoke-wayland.sh` runs the
 headless startup test for the binary or the package, with a parametrizable
