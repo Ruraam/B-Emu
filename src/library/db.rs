@@ -110,7 +110,10 @@ fn remove_missing_from_roots_on(
 ) -> Result<usize, rusqlite::Error> {
     let mut statement = conn.prepare("SELECT path, source_dir FROM games")?;
     let rows = statement.query_map([], |row| {
-        Ok((PathBuf::from(row.get::<_, String>(0)?), PathBuf::from(row.get::<_, String>(1)?)))
+        Ok((
+            PathBuf::from(row.get::<_, String>(0)?),
+            PathBuf::from(row.get::<_, String>(1)?),
+        ))
     })?;
     let mut candidates = Vec::new();
     for row in rows {
@@ -523,7 +526,8 @@ mod tests {
             .unwrap();
         assert_eq!(db.games().unwrap().len(), 1);
 
-        db.apply_scan(&[], &HashSet::new(), &[PathBuf::from("/roms")]).unwrap();
+        db.apply_scan(&[], &HashSet::new(), &[PathBuf::from("/roms")])
+            .unwrap();
         assert!(db.games().unwrap().is_empty());
     }
 
@@ -546,15 +550,21 @@ mod tests {
         db.mark_played("/external/missing.sfc").unwrap();
 
         let seen = HashSet::from([available.path.clone()]);
-        let removed = db.apply_scan(
-            &[(available, ScanOutcome::Unchanged)],
-            &seen,
-            &[PathBuf::from("/roms")],
-        ).unwrap();
+        let removed = db
+            .apply_scan(
+                &[(available, ScanOutcome::Unchanged)],
+                &seen,
+                &[PathBuf::from("/roms")],
+            )
+            .unwrap();
 
         assert_eq!(removed, 0);
         assert_eq!(db.games().unwrap().len(), 2);
-        assert!(db.favorite_paths().unwrap().contains("/external/missing.sfc"));
+        assert!(
+            db.favorite_paths()
+                .unwrap()
+                .contains("/external/missing.sfc")
+        );
         assert_eq!(db.recently_played(10).unwrap().len(), 1);
     }
 
