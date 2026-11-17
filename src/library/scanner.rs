@@ -216,7 +216,7 @@ mod tests {
         use std::os::unix::ffi::OsStringExt;
 
         let dir = tempfile::tempdir().unwrap();
-        let name = std::ffi::OsString::from_vec(b"rom-\\xff.nes".to_vec());
+        let name = std::ffi::OsString::from_vec(b"rom-\xff.nes".to_vec());
         fs::write(dir.path().join(name), b"rom").unwrap();
 
         let result = scan_root(
@@ -238,7 +238,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir
             .path()
-            .join(std::ffi::OsString::from_vec(b"roms-\\xff".to_vec()));
+            .join(std::ffi::OsString::from_vec(b"roms-\xff".to_vec()));
         fs::create_dir(&root).unwrap();
 
         let result = scan_root(
