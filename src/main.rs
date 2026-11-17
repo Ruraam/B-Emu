@@ -6,8 +6,9 @@ use std::{
 };
 
 use b_emu::{
+    bios::{self, BiosStatus},
     config::Config,
-    emulators::{self, EmulatorInstallation},
+    emulators::{self, EmulatorInstallation, adapters::BiosRequirement},
     input::{
         GamepadAction,
         navigation::{FocusZone, Navigation, apply_action},
@@ -107,6 +108,7 @@ fn apply_nav_action(
     config_path: &Path,
     db_path: &Path,
     installations: &[EmulatorInstallation],
+    bios_store: &Rc<RefCell<Vec<BiosStatus>>>,
     action: NavAction,
 ) {
     let gamepad_action = action_from_nav(action);
@@ -186,6 +188,7 @@ fn apply_nav_action(
             3 => {
                 window.set_selected_item(next.focused_item);
                 refresh_capabilities(window, config_path, installations);
+                refresh_selected_bios(window, installations, bios_store);
             }
             4 => activate_settings_item(window, next.focused_item),
             _ => {}
@@ -260,6 +263,69 @@ fn refresh_emulators(
         .collect();
     window.set_emulators(model(rows));
     refresh_capabilities(window, config_path, installations);
+}
+
+fn bios_rows(statuses: &[BiosStatus]) -> Vec<BiosRow> {
+    statuses
+        .iter()
+        .map(|status| BiosRow {
+            name: SharedString::from(status.name.as_str()),
+            system: SharedString::from(status.system.as_str()),
+            present: status.present,
+            checksum: SharedString::from(status.checksum.as_deref().unwrap_or("")),
+        })
+        .collect()
+}
+
+fn refresh_bios(
+    window: &MainWindow,
+    config_path: &Path,
+    data_dir: &Path,
+    installations: &[EmulatorInstallation],
+    store: &Rc<RefCell<Vec<BiosStatus>>>,
+) {
+    let config = match Config::load(config_path) {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("[b-emu] could not load BIOS settings: {error}");
+            return;
+        }
+    };
+    let dir = config
+        .bios_dir
+        .clone()
+        .unwrap_or_else(|| data_dir.join("bios"));
+    let requirements: Vec<(String, BiosRequirement)> = installations
+        .iter()
+        .flat_map(|install| {
+            install
+                .adapter
+                .bios
+                .iter()
+                .map(move |requirement| (install.id.clone(), *requirement))
+        })
+        .collect();
+
+    let statuses = bios::inventory(&dir, &requirements);
+    *store.borrow_mut() = statuses.clone();
+    window.set_bios(model(bios_rows(&statuses)));
+}
+
+fn refresh_selected_bios(
+    window: &MainWindow,
+    installations: &[EmulatorInstallation],
+    store: &Rc<RefCell<Vec<BiosStatus>>>,
+) {
+    let selected = installations
+        .get(window.get_selected_item().max(0) as usize)
+        .map(|install| install.id.as_str());
+    let filtered: Vec<BiosStatus> = store
+        .borrow()
+        .iter()
+        .filter(|status| Some(status.emulator_id.as_str()) == selected)
+        .cloned()
+        .collect();
+    window.set_bios(model(bios_rows(&filtered)));
 }
 
 fn toggle_capability_at(
@@ -356,17 +422,40 @@ fn to_indexed_games(
     records: Vec<GameRecord>,
     duplicates: &HashMap<String, usize>,
     favorites: &HashSet<String>,
+    metadata: &HashMap<String, b_emu::metadata::Metadata>,
+    images: &HashMap<String, slint::Image>,
 ) -> Vec<IndexedGame> {
     records
         .into_iter()
-        .map(|game| IndexedGame {
-            title: SharedString::from(game.title),
-            system: SharedString::from(game.system.clone()),
-            path: SharedString::from(path_key(&game.path)),
-            size: game_size(game.size),
-            accent: shell::system_accent(&game.system),
-            duplicate: duplicates.get(&game.checksum).copied().unwrap_or(0) > 1,
-            favorite: favorites.contains(&path_key(&game.path)),
+        .map(|game| {
+            let key = path_key(&game.path);
+            let detail = metadata.get(&key);
+            let image = images.get(&key);
+            IndexedGame {
+                title: SharedString::from(game.title),
+                system: SharedString::from(game.system.clone()),
+                path: SharedString::from(key.as_str()),
+                size: game_size(game.size),
+                accent: shell::system_accent(&game.system),
+                duplicate: duplicates.get(&game.checksum).copied().unwrap_or(0) > 1,
+                favorite: favorites.contains(&key),
+                description: SharedString::from(
+                    detail.map(|value| value.description.as_str()).unwrap_or(""),
+                ),
+                year: SharedString::from(
+                    detail
+                        .and_then(|value| value.year)
+                        .map(|year| year.to_string())
+                        .unwrap_or_default()
+                        .as_str(),
+                ),
+                region: SharedString::from(detail.map(|value| value.region.as_str()).unwrap_or("")),
+                provider: SharedString::from(
+                    detail.map(|value| value.provider.as_str()).unwrap_or(""),
+                ),
+                artwork: image.cloned().unwrap_or_default(),
+                has_artwork: image.is_some(),
+            }
         })
         .collect()
 }
@@ -376,6 +465,16 @@ fn refresh_library(window: &MainWindow, db_path: &Path) -> Result<(), Box<dyn st
     let all = library.games()?;
     let counts = library.counts()?;
     let favorites = library.favorite_paths()?;
+    let metadata = library.metadata_map()?;
+    let images: HashMap<String, slint::Image> = library
+        .artwork_map()?
+        .into_iter()
+        .filter_map(|(key, value)| {
+            slint::Image::load_from_path(&value.cache_path)
+                .ok()
+                .map(|image| (key, image))
+        })
+        .collect();
 
     let mut duplicates: HashMap<String, usize> = HashMap::new();
     for game in &all {
@@ -394,13 +493,29 @@ fn refresh_library(window: &MainWindow, db_path: &Path) -> Result<(), Box<dyn st
         filtered_games(&library, window)?,
         &duplicates,
         &favorites,
+        &metadata,
+        &images,
     )));
-    window.set_recent_games(model(to_indexed_games(recent, &duplicates, &favorites)));
-    window.set_played_games(model(to_indexed_games(played, &duplicates, &favorites)));
+    window.set_recent_games(model(to_indexed_games(
+        recent,
+        &duplicates,
+        &favorites,
+        &metadata,
+        &images,
+    )));
+    window.set_played_games(model(to_indexed_games(
+        played,
+        &duplicates,
+        &favorites,
+        &metadata,
+        &images,
+    )));
     window.set_last_played(model(to_indexed_games(
         last_played,
         &duplicates,
         &favorites,
+        &metadata,
+        &images,
     )));
 
     let systems: Vec<SystemStat> = library
@@ -535,6 +650,7 @@ fn start_scan(
     window: &MainWindow,
     config_path: &Path,
     db_path: &Path,
+    cache_dir: &Path,
     slot: &Rc<RefCell<Option<scan_worker::ScanWorker>>>,
 ) {
     let config = match Config::load(config_path) {
@@ -552,10 +668,17 @@ fn start_scan(
 
     let weak = window.as_weak();
     let refresh_db = db_path.to_path_buf();
+    let refresh_cache = cache_dir.to_path_buf();
     let on_finished = Box::new(move || {
         let weak = weak.clone();
         let refresh_db = refresh_db.clone();
+        let refresh_cache = refresh_cache.clone();
         let _ = weak.upgrade_in_event_loop(move |ui| {
+            if let Ok(library) = Library::open(&refresh_db) {
+                if let Err(error) = library.enrich_all(&refresh_cache) {
+                    eprintln!("[b-emu] could not enrich metadata: {error}");
+                }
+            }
             if let Err(error) = refresh_library(&ui, &refresh_db) {
                 eprintln!("[b-emu] could not refresh library view: {error}");
             }
@@ -599,12 +722,28 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let config_path = paths.config_dir.join("config.json");
     let db_path = paths.data_dir.join("library.sqlite3");
 
+    let cache_dir = paths.cache_dir.join("artwork");
     let installations: Rc<RefCell<Vec<EmulatorInstallation>>> =
         Rc::new(RefCell::new(emulators::discovery::discover()));
+    let bios_store: Rc<RefCell<Vec<BiosStatus>>> = Rc::new(RefCell::new(Vec::new()));
 
     let window = MainWindow::new()?;
     window.set_pages(model(shell::pages()));
     refresh_emulators(&window, &config_path, &installations.borrow());
+    refresh_bios(
+        &window,
+        &config_path,
+        &paths.data_dir,
+        &installations.borrow(),
+        &bios_store,
+    );
+
+    if let Err(error) = Library::open(&db_path).and_then(|library| {
+        library.enrich_all(&cache_dir)?;
+        Ok(())
+    }) {
+        eprintln!("[b-emu] could not enrich metadata: {error}");
+    }
 
     if let Err(error) = refresh_dirs(&window, &config_path) {
         eprintln!("[b-emu] could not load game directories: {error}");
@@ -621,9 +760,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let config = config_path.clone();
     let db = db_path.clone();
     let installs = Rc::clone(&installations);
+    let bios = Rc::clone(&bios_store);
     window.on_request_action(move |action| {
         if let Some(window) = weak.upgrade() {
-            apply_nav_action(&window, &config, &db, &installs.borrow(), action);
+            apply_nav_action(&window, &config, &db, &installs.borrow(), &bios, action);
         }
     });
 
@@ -653,10 +793,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let weak = window.as_weak();
     let config = config_path.clone();
     let db = db_path.clone();
+    let cache_dir_for_scan = cache_dir.clone();
     let slot = Rc::clone(&scan_slot);
     window.on_scan_now(move || {
         if let Some(window) = weak.upgrade() {
-            start_scan(&window, &config, &db, &slot);
+            start_scan(&window, &config, &db, &cache_dir_for_scan, &slot);
         }
     });
 
@@ -719,10 +860,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let weak = window.as_weak();
     let config = config_path.clone();
     let installs = Rc::clone(&installations);
+    let bios = Rc::clone(&bios_store);
     window.on_select_emulator(move |index| {
         if let Some(window) = weak.upgrade() {
             window.set_selected_item(index);
             refresh_capabilities(&window, &config, &installs.borrow());
+            refresh_selected_bios(&window, &installs.borrow(), &bios);
         }
     });
 
@@ -776,7 +919,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             .map(|config| !config.game_dirs.is_empty())
             .unwrap_or(false)
     {
-        start_scan(&window, &config_path, &db_path, &scan_slot);
+        start_scan(&window, &config_path, &db_path, &cache_dir, &scan_slot);
     }
 
     let _gamepad_worker = match gamepad_worker::GamepadWorker::start(window.as_weak()) {

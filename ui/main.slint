@@ -1,6 +1,6 @@
 import { Theme, Motion } from "theme.slint";
 import { SidebarItem } from "components/sidebar-item.slint";
-import { NavAction, IndexedGame, SystemStat, EmulatorRow, CapabilityRow } from "models.slint";
+import { NavAction, IndexedGame, SystemStat, EmulatorRow, CapabilityRow, BiosRow } from "models.slint";
 import { HomeScreen } from "screens/home.slint";
 import { SystemsScreen } from "screens/systems.slint";
 import { LibraryScreen } from "screens/library.slint";
@@ -30,6 +30,7 @@ export component MainWindow inherits Window {
     in property<[SystemStat]> systems;
     in property<[EmulatorRow]> emulators;
     in property<[CapabilityRow]> capabilities;
+    in property<[BiosRow]> bios;
     in-out property<string> search-text: "";
     in-out property<int> games-count: 0;
     in-out property<int> systems-count: 0;
@@ -258,6 +259,7 @@ export component MainWindow inherits Window {
                     if root.active-page == 3: EmulatorsScreen {
                         emulators: root.emulators;
                         capabilities: root.capabilities;
+                        bios: root.bios;
                         selected-item: root.selected-item;
                         focused-item: root.focused-item;
                         content-focused: root.focus-zone == 1;

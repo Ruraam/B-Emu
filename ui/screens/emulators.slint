@@ -3,11 +3,12 @@ import { GlassPanel } from "../components/glass-panel.slint";
 import { PageHeader } from "../components/page-header.slint";
 import { ListRow } from "../components/list-row.slint";
 import { StatusPill } from "../components/status-pill.slint";
-import { EmulatorRow, CapabilityRow } from "../models.slint";
+import { EmulatorRow, CapabilityRow, BiosRow } from "../models.slint";
 
 export component EmulatorsScreen inherits VerticalLayout {
     in property<[EmulatorRow]> emulators;
     in property<[CapabilityRow]> capabilities;
+    in property<[BiosRow]> bios;
     in property<int> focused-item: 0;
     in property<bool> content-focused: false;
     in property<int> selected-item: -1;
@@ -87,13 +88,19 @@ export component EmulatorsScreen inherits VerticalLayout {
                     font-size: 12px;
                 }
 
-                Text {
-                    text: root.selected-item >= 0 && root.selected-item < root.emulators.length && root.emulators[root.selected-item].bios != ""
-                        ? "BIOS requis : " + root.emulators[root.selected-item].bios
-                        : "Aucun BIOS requis déclaré";
+                Text { text: "BIOS / FIRMWARE"; color: Theme.text-muted; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; }
+
+                if root.bios.length == 0: Text {
+                    text: "Aucun BIOS requis déclaré.";
                     color: Theme.text-muted;
                     font-size: 11px;
-                    wrap: word-wrap;
+                }
+
+                for item in root.bios: HorizontalLayout {
+                    spacing: 8px;
+                    Text { text: item.present ? "✓" : "✗"; color: item.present ? Theme.accent-cyan : #F87171; font-size: 13px; }
+                    Text { text: item.name; color: Theme.text-primary; font-size: 11px; horizontal-stretch: 1; }
+                    Text { text: item.present ? "présent" : "manquant"; color: item.present ? Theme.accent-cyan : Theme.text-muted; font-size: 10px; }
                 }
 
                 Rectangle { height: 1px; background: Theme.border; }

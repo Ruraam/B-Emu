@@ -38,6 +38,19 @@ export struct IndexedGame {
     accent: color,
     duplicate: bool,
     favorite: bool,
+    description: string,
+    year: string,
+    region: string,
+    provider: string,
+    artwork: image,
+    has-artwork: bool,
+}
+
+export struct BiosRow {
+    name: string,
+    system: string,
+    present: bool,
+    checksum: string,
 }
 
 // Aggregated system information from the SQLite index.

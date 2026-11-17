@@ -7,7 +7,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, params};
 
 use super::scanner::{KnownFile, ScannedGame};
 
@@ -350,26 +350,6 @@ impl LibraryDb {
             ))
         })?;
         rows.collect()
-    }
-
-    pub fn metadata_for(
-        &self,
-        path: &str,
-    ) -> Result<Option<crate::metadata::Metadata>, rusqlite::Error> {
-        self.conn
-            .query_row(
-                "SELECT path, title, description, year, region, provider FROM metadata WHERE path = ?1",
-                params![path],
-                |row| Ok(crate::metadata::Metadata {
-                    path: row.get(0)?,
-                    title: row.get(1)?,
-                    description: row.get(2)?,
-                    year: row.get(3)?,
-                    region: row.get(4)?,
-                    provider: row.get(5)?,
-                }),
-            )
-            .optional()
     }
 
     pub fn upsert_artwork(
