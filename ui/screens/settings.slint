@@ -50,7 +50,6 @@ export component SettingsScreen inherits VerticalLayout {
 
     Flickable {
         vertical-stretch: 1;
-        content-height: 660px;
 
         HorizontalLayout {
             width: parent.width;
@@ -62,8 +61,10 @@ export component SettingsScreen inherits VerticalLayout {
 
                 Text { text: "PRÉFÉRENCES"; color: Theme.accent-indigo; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
 
-                VerticalLayout {
-                    spacing: 8px;
+                GlassPanel {
+                    horizontal-stretch: 1;
+                    panel-padding: 10px;
+                    panel-spacing: 8px;
 
                     ListRow {
                         focused: root.content-focused && root.focused-item == 0;
