@@ -488,7 +488,7 @@ mod tests {
 
         let db = LibraryDb::open_in_memory().unwrap();
         let invalid = ScannedGame {
-            path: PathBuf::from(std::ffi::OsString::from_vec(b"/roms/rom-\\xff.nes".to_vec())),
+            path: PathBuf::from(std::ffi::OsString::from_vec(b"/roms/rom-\xff.nes".to_vec())),
             title: "rom".to_owned(),
             system: "Nintendo".to_owned(),
             size: 1,
