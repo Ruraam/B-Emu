@@ -449,12 +449,23 @@ mod tests {
         use super::RepeatScheduler;
         use std::time::Instant;
 
+        use crate::input::profiles::ControllerProfile;
+        use std::collections::BTreeMap;
+
         let start = Instant::now();
         let mut pressed = ButtonActionTracker::default();
         let mut repeater = RepeatScheduler::default();
+        let profile = ControllerProfile {
+            id: "inverted-dpad".into(),
+            name: "Inverted D-pad".into(),
+            device_name_contains: Some("test pad".into()),
+            guid: None,
+            remap: BTreeMap::from([("up".into(), "down".into())]),
+        };
 
         // The profile maps the physical D-pad Up button to NavigateDown.
-        let mapped_action = GamepadAction::NavigateDown;
+        let mapped_action = profile.apply(button_action(Button::DPadUp).unwrap());
+        assert_eq!(mapped_action, GamepadAction::NavigateDown);
         pressed.press(0, Button::DPadUp, mapped_action);
         repeater.press(0, mapped_action, start);
 
