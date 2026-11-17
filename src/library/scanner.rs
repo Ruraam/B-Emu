@@ -103,6 +103,13 @@ pub fn scan_root(
     let mut result = ScanResult::default();
     let mut files = Vec::new();
 
+    // SQLite stores paths as TEXT. Reject non-UTF-8 roots explicitly rather
+    // than silently indexing a lossy path that may collide with another file.
+    if root.to_str().is_none() {
+        result.errors += 1;
+        return result;
+    }
+
     for entry in WalkDir::new(root)
         .follow_links(false)
         .into_iter()
@@ -115,7 +122,11 @@ pub fn scan_root(
 
         match entry {
             Ok(entry) if entry.file_type().is_file() && system_for_path(entry.path()).is_some() => {
-                files.push(entry.into_path());
+                if entry.path().to_str().is_none() {
+                    result.errors += 1;
+                } else {
+                    files.push(entry.into_path());
+                }
             }
             Ok(_) => {}
             Err(_) => result.errors += 1,
