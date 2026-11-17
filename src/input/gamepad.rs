@@ -3,6 +3,7 @@
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock},
+    time::{Duration, Instant},
 };
 
 use gilrs::{
@@ -57,6 +58,7 @@ pub struct GamepadInput {
     gilrs: Gilrs,
     axis_states: HashMap<GamepadId, AxisState>,
     profiles: Arc<RwLock<Vec<ControllerProfile>>>,
+    repeater: RepeatScheduler,
 }
 
 impl GamepadInput {
@@ -74,6 +76,7 @@ impl GamepadInput {
             gilrs,
             axis_states: HashMap::new(),
             profiles,
+            repeater: RepeatScheduler::default(),
         })
     }
 
@@ -145,32 +148,100 @@ impl GamepadInput {
                 }
                 EventType::Disconnected => {
                     self.axis_states.remove(&id);
+                    self.repeater.release_gamepad(numeric_id);
                     translated.push(GamepadEvent::Disconnected { id: numeric_id });
                 }
                 EventType::ButtonPressed(button, _) => {
-                    if let Some(action) = button_action(button) {
-                        translated.push(GamepadEvent::Action {
-                            id: numeric_id,
-                            action: self.remap(id, action),
-                        });
-                    }
-                }
-                EventType::AxisChanged(axis, value, _) => {
-                    if let Some(action) =
-                        self.axis_states.entry(id).or_default().update(axis, value)
+                    if let Some(action) = button_action(button).map(|action| self.remap(id, action))
                     {
                         translated.push(GamepadEvent::Action {
                             id: numeric_id,
-                            action: self.remap(id, action),
+                            action,
                         });
+                        if is_repeatable_direction(action) {
+                            self.repeater.press(numeric_id, action, Instant::now());
+                        }
+                    }
+                }
+                EventType::ButtonReleased(button, _) => {
+                    if let Some(action) =
+                        button_action(button).filter(|a| is_repeatable_direction(*a))
+                    {
+                        self.repeater.release(numeric_id, action);
+                    }
+                }
+                EventType::AxisChanged(axis, value, _) => {
+                    let transitions = self.axis_states.entry(id).or_default().update(axis, value);
+                    for (action, pressed) in transitions {
+                        let action = self.remap(id, action);
+                        if pressed {
+                            translated.push(GamepadEvent::Action {
+                                id: numeric_id,
+                                action,
+                            });
+                            self.repeater.press(numeric_id, action, Instant::now());
+                        } else {
+                            self.repeater.release(numeric_id, action);
+                        }
                     }
                 }
                 _ => {}
             }
         }
 
+        translated.extend(
+            self.repeater
+                .due(Instant::now())
+                .into_iter()
+                .map(|(id, action)| GamepadEvent::Action { id, action }),
+        );
+
         translated
     }
+}
+
+#[derive(Debug, Default)]
+struct RepeatScheduler {
+    next_repeat: HashMap<(usize, GamepadAction), Instant>,
+}
+
+impl RepeatScheduler {
+    fn press(&mut self, id: usize, action: GamepadAction, now: Instant) {
+        self.next_repeat.insert((id, action), now + REPEAT_DELAY);
+    }
+
+    fn release(&mut self, id: usize, action: GamepadAction) {
+        self.next_repeat.remove(&(id, action));
+    }
+
+    fn release_gamepad(&mut self, id: usize) {
+        self.next_repeat
+            .retain(|(gamepad_id, _), _| *gamepad_id != id);
+    }
+
+    fn due(&mut self, now: Instant) -> Vec<(usize, GamepadAction)> {
+        let mut actions = Vec::new();
+        for (&key, next_at) in &mut self.next_repeat {
+            if now >= *next_at {
+                actions.push(key);
+                *next_at = now + REPEAT_INTERVAL;
+            }
+        }
+        actions
+    }
+}
+
+const REPEAT_DELAY: Duration = Duration::from_millis(400);
+const REPEAT_INTERVAL: Duration = Duration::from_millis(120);
+
+fn is_repeatable_direction(action: GamepadAction) -> bool {
+    matches!(
+        action,
+        GamepadAction::NavigateUp
+            | GamepadAction::NavigateDown
+            | GamepadAction::NavigateLeft
+            | GamepadAction::NavigateRight
+    )
 }
 
 fn button_action(button: Button) -> Option<GamepadAction> {
@@ -236,7 +307,7 @@ struct AxisState {
 }
 
 impl AxisState {
-    fn update(&mut self, axis: Axis, value: f32) -> Option<GamepadAction> {
+    fn update(&mut self, axis: Axis, value: f32) -> Vec<(GamepadAction, bool)> {
         let (gate, negative, positive) = match axis {
             Axis::LeftStickX => (
                 &mut self.left_x,
@@ -260,22 +331,41 @@ impl AxisState {
                 GamepadAction::NavigateDown,
                 GamepadAction::NavigateUp,
             ),
-            _ => return None,
+            _ => return Vec::new(),
         };
 
-        match gate.update(value)? {
+        let previous = gate.direction;
+        gate.update(value);
+        let current = gate.direction;
+        if previous == current {
+            return Vec::new();
+        }
+
+        let action_for = |direction| match direction {
             AxisDirection::Negative => Some(negative),
             AxisDirection::Positive => Some(positive),
             AxisDirection::Neutral => None,
+        };
+        let mut transitions = Vec::with_capacity(2);
+        if let Some(action) = action_for(previous) {
+            transitions.push((action, false));
         }
+        if let Some(action) = action_for(current) {
+            transitions.push((action, true));
+        }
+        transitions
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{AxisDirection, AxisGate, AxisState, button_action};
+    use super::{
+        AxisDirection, AxisGate, AxisState, REPEAT_DELAY, REPEAT_INTERVAL, button_action,
+        is_repeatable_direction,
+    };
     use crate::input::GamepadAction;
     use gilrs::{Axis, Button};
+    use std::time::Duration;
 
     #[test]
     fn xbox_style_face_buttons_map_to_confirm_and_back() {
@@ -316,6 +406,59 @@ mod tests {
     }
 
     #[test]
+    fn only_navigation_directions_repeat() {
+        assert!(is_repeatable_direction(GamepadAction::NavigateUp));
+        assert!(is_repeatable_direction(GamepadAction::NavigateDown));
+        assert!(is_repeatable_direction(GamepadAction::NavigateLeft));
+        assert!(is_repeatable_direction(GamepadAction::NavigateRight));
+        assert!(!is_repeatable_direction(GamepadAction::Confirm));
+        assert!(!is_repeatable_direction(GamepadAction::Back));
+        assert_eq!(REPEAT_DELAY, Duration::from_millis(400));
+        assert_eq!(REPEAT_INTERVAL, Duration::from_millis(120));
+    }
+
+    #[test]
+    fn held_direction_repeats_after_delay_then_at_interval_until_released() {
+        use super::RepeatScheduler;
+        use std::time::{Duration, Instant};
+
+        let start = Instant::now();
+        let mut repeater = RepeatScheduler::default();
+        repeater.press(0, GamepadAction::NavigateUp, start);
+
+        assert!(repeater.due(start + Duration::from_millis(399)).is_empty());
+        assert_eq!(
+            repeater.due(start + Duration::from_millis(400)),
+            vec![(0, GamepadAction::NavigateUp)]
+        );
+        assert!(repeater.due(start + Duration::from_millis(519)).is_empty());
+        assert_eq!(
+            repeater.due(start + Duration::from_millis(520)),
+            vec![(0, GamepadAction::NavigateUp)]
+        );
+
+        repeater.release(0, GamepadAction::NavigateUp);
+        assert!(repeater.due(start + Duration::from_secs(5)).is_empty());
+    }
+
+    #[test]
+    fn disconnect_clears_all_repeat_states_for_that_controller() {
+        use super::RepeatScheduler;
+        use std::time::{Duration, Instant};
+
+        let start = Instant::now();
+        let mut repeater = RepeatScheduler::default();
+        repeater.press(0, GamepadAction::NavigateUp, start);
+        repeater.press(1, GamepadAction::NavigateDown, start);
+        repeater.release_gamepad(0);
+
+        assert_eq!(
+            repeater.due(start + Duration::from_millis(400)),
+            vec![(1, GamepadAction::NavigateDown)]
+        );
+    }
+
+    #[test]
     fn axis_gate_uses_threshold_and_hysteresis() {
         let mut gate = AxisGate::default();
 
@@ -343,11 +486,11 @@ mod tests {
 
         assert_eq!(
             state.update(Axis::LeftStickY, 0.8),
-            Some(GamepadAction::NavigateUp)
+            vec![(GamepadAction::NavigateUp, true)]
         );
         assert_eq!(
             state.update(Axis::LeftStickX, 0.8),
-            Some(GamepadAction::NavigateRight)
+            vec![(GamepadAction::NavigateRight, true)]
         );
     }
 
@@ -357,11 +500,11 @@ mod tests {
 
         assert_eq!(
             state.update(Axis::DPadY, -0.8),
-            Some(GamepadAction::NavigateDown)
+            vec![(GamepadAction::NavigateDown, true)]
         );
         assert_eq!(
             state.update(Axis::DPadX, -0.8),
-            Some(GamepadAction::NavigateLeft)
+            vec![(GamepadAction::NavigateLeft, true)]
         );
     }
 
@@ -371,8 +514,11 @@ mod tests {
 
         assert_eq!(
             state.update(Axis::LeftStickY, 0.8),
-            Some(GamepadAction::NavigateUp)
+            vec![(GamepadAction::NavigateUp, true)]
         );
-        assert_eq!(state.update(Axis::LeftStickY, 0.1), None);
+        assert_eq!(
+            state.update(Axis::LeftStickY, 0.1),
+            vec![(GamepadAction::NavigateUp, false)]
+        );
     }
 }

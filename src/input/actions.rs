@@ -1,7 +1,7 @@
 //! Normalized actions produced by gamepad controls.
 
 /// Actions that the B-Emu interface can consume independently of a controller model.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GamepadAction {
     NavigateUp,
     NavigateDown,
