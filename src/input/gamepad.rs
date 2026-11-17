@@ -222,8 +222,7 @@ impl ButtonActionTracker {
     }
 
     fn release_gamepad(&mut self, id: usize) {
-        self.pressed
-            .retain(|(gamepad_id, _), _| *gamepad_id != id);
+        self.pressed.retain(|(gamepad_id, _), _| *gamepad_id != id);
     }
 }
 
@@ -475,7 +474,11 @@ mod tests {
         assert_eq!(released_action, GamepadAction::NavigateDown);
         repeater.release(0, released_action);
 
-        assert!(repeater.due(start + REPEAT_DELAY + REPEAT_INTERVAL).is_empty());
+        assert!(
+            repeater
+                .due(start + REPEAT_DELAY + REPEAT_INTERVAL)
+                .is_empty()
+        );
         assert!(pressed.release(0, Button::DPadUp).is_none());
     }
 
