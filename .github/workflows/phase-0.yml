@@ -8,6 +8,7 @@ on:
       - phase-1-app-shell
       - phase-1-navigation
       - phase-1-gamepad-input
+      - phase-1-gamepad-ui
   pull_request:
     branches:
       - main
@@ -15,6 +16,7 @@ on:
       - phase-1-app-shell
       - phase-1-navigation
       - phase-1-gamepad-input
+      - phase-1-gamepad-ui
 
 permissions:
   contents: read
@@ -29,6 +31,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes \
             pkg-config \
+            binutils \
+            jq \
             libudev-dev \
             libwayland-dev \
             libxkbcommon-dev \
@@ -52,6 +56,19 @@ jobs:
       - name: Audit backend features (X11 must be absent)
         run: bash scripts/check-wayland-features.sh
 
+      - name: Audit launch safety (no shell command strings)
+        run: bash scripts/check-launch-safety.sh
+
+      - name: Validate LPK architecture selection
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/package-lpk.sh scripts/release-lpk.sh
+          if ARCH=unknown bash scripts/package-lpk.sh; then
+            echo "Unsupported LPK architecture was accepted." >&2
+            exit 1
+          fi
+
       - name: Compile all targets
         run: cargo check --all-targets
 
@@ -60,6 +77,25 @@ jobs:
 
       - name: Build B-Emu executable
         run: cargo build --bin b-emu
+
+      - name: Verify LPK native binary architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          fake_ulpm="$RUNNER_TEMP/fake-ulpm"
+          cat > "$fake_ulpm" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          case "$1" in
+            pack) printf "fake-lpk\\n" > "$4" ;;
+            inspect) test -s "$2" ;;
+            *) echo "Unexpected fake ULPM command: $1" >&2; exit 1 ;;
+          esac
+          EOF
+          chmod +x "$fake_ulpm"
+          ULPM="$fake_ulpm" ARCH=amd64 OUT="$RUNNER_TEMP/b-emu-amd64.lpk" \
+            bash scripts/package-lpk.sh
+          test -s "$RUNNER_TEMP/b-emu-amd64.lpk"
 
       - name: Verify native Wayland connection and B-Emu startup with Weston headless
         shell: bash

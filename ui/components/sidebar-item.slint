@@ -5,9 +5,10 @@ export component SidebarItem inherits Rectangle {
     in property<bool> selected: false;
     in property<bool> focused: false;
     callback activated();
+    callback hovered();
 
     height: 46px;
-    border-radius: 10px;
+    border-radius: 12px;
     border-width: 1px;
     border-color: root.focused ? Theme.border-highlight : (root.selected ? Theme.border : transparent);
     background: root.selected ? Theme.sidebar-selected : (root.focused ? Theme.sidebar-focus : Theme.sidebar);
@@ -31,12 +32,21 @@ export component SidebarItem inherits Rectangle {
             font-size: 14px;
             font-weight: root.selected ? 700 : 500;
             vertical-alignment: center;
+            horizontal-alignment: center;
         }
     }
 
     TouchArea {
+        mouse-cursor: pointer;
+
         clicked => {
             root.activated();
+        }
+
+        changed has-hover => {
+            if (self.has-hover) {
+                root.hovered();
+            }
         }
     }
 }

@@ -1,0 +1,235 @@
+import { Theme, Motion } from "../theme.slint";
+import { GlassPanel } from "../components/glass-panel.slint";
+import { PageHeader } from "../components/page-header.slint";
+import { ListRow } from "../components/list-row.slint";
+
+component Toggle inherits Rectangle {
+    in property<bool> on: false;
+
+    width: 42px;
+    height: 22px;
+    border-radius: 11px;
+    background: root.on ? Theme.accent-cyan : Theme.border;
+
+    animate background {
+        duration: Motion.duration;
+    }
+
+    Rectangle {
+        x: root.on ? 22px : 3px;
+        y: 3px;
+        width: 16px;
+        height: 16px;
+        border-radius: 8px;
+        background: root.on ? #020617 : Theme.text-secondary;
+
+        animate x, background {
+            duration: Motion.duration;
+        }
+    }
+}
+
+export component SettingsScreen inherits VerticalLayout {
+    in property<bool> auto-scan: true;
+    in property<bool> vibration: true;
+    in property<bool> reduced-motion: false;
+    in property<[string]> game-dirs;
+    in property<[string]> system-rows;
+    in property<string> scan-status: "Prêt";
+    in property<float> scan-progress: 0;
+    in-out property<string> new-dir-text: "";
+    in-out property<int> pending-remove: -1;
+    in property<int> focused-item: 0;
+    in property<bool> content-focused: false;
+
+    callback toggle-setting(int);
+    callback add-dir(string);
+    callback remove-dir(int);
+    callback scan-now();
+
+    spacing: 10px;
+
+    PageHeader {
+        eyebrow: "B-EMU / PARAMÈTRES";
+        title: "Paramètres";
+        subtitle: "Préférences et bibliothèque. Tout est enregistré dans les répertoires XDG.";
+    }
+
+    HorizontalLayout {
+        vertical-stretch: 1;
+            spacing: 16px;
+
+            VerticalLayout {
+                horizontal-stretch: 3;
+                spacing: 8px;
+
+                Text { text: "PRÉFÉRENCES"; color: Theme.accent-indigo; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
+
+                GlassPanel {
+                    horizontal-stretch: 1;
+                    panel-padding: 10px;
+                    panel-spacing: 6px;
+
+                    ListRow {
+                        row-height: 46px;
+                        row-padding: 10px;
+                        focused: root.content-focused && root.focused-item == 0;
+                        selected: root.focused-item == 0;
+                        activated => { root.pending-remove = -1; root.toggle-setting(0); }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            spacing: 2px;
+                            Text { text: "Analyse automatique"; color: Theme.text-primary; font-size: 13px; font-weight: 600; }
+                            Text { text: "Indexer les dossiers au démarrage"; color: Theme.text-muted; font-size: 10px; }
+                        }
+                        Toggle { on: root.auto-scan; }
+                    }
+
+                    ListRow {
+                        row-height: 46px;
+                        row-padding: 10px;
+                        focused: root.content-focused && root.focused-item == 1;
+                        selected: root.focused-item == 1;
+                        activated => { root.pending-remove = -1; root.toggle-setting(1); }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            spacing: 2px;
+                            Text { text: "Retour de force"; color: Theme.text-primary; font-size: 13px; font-weight: 600; }
+                            Text { text: "Vibration de la manette lors de la navigation"; color: Theme.text-muted; font-size: 10px; }
+                        }
+                        Toggle { on: root.vibration; }
+                    }
+
+                    ListRow {
+                        row-height: 46px;
+                        row-padding: 10px;
+                        focused: root.content-focused && root.focused-item == 2;
+                        selected: root.focused-item == 2;
+                        activated => { root.pending-remove = -1; root.toggle-setting(2); }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            spacing: 2px;
+                            Text { text: "Réduire les animations"; color: Theme.text-primary; font-size: 13px; font-weight: 600; }
+                            Text { text: "Désactiver les transitions de l'interface"; color: Theme.text-muted; font-size: 10px; }
+                        }
+                        Toggle { on: root.reduced-motion; }
+                    }
+                }
+
+                Text { text: "BIBLIOTHÈQUE"; color: Theme.accent-indigo; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
+
+                GlassPanel {
+                    horizontal-stretch: 1;
+                    panel-padding: 12px;
+                    panel-spacing: 6px;
+
+                    if root.game-dirs.length == 0: Text {
+                        text: "Aucun dossier configuré. Ajoutez-en un ci-dessous pour commencer.";
+                        color: Theme.text-muted;
+                        font-size: 11px;
+                        wrap: word-wrap;
+                    }
+
+                    for dir[i] in root.game-dirs: ListRow {
+                        row-height: 46px;
+                        row-padding: 10px;
+                        focused: root.content-focused && root.focused-item == 3 + i;
+                        selected: root.focused-item == 3 + i;
+                        activated => {
+                            if (root.pending-remove == i) {
+                                root.remove-dir(i);
+                                root.pending-remove = -1;
+                            } else {
+                                root.pending-remove = i;
+                            }
+                        }
+                        Text {
+                            text: root.pending-remove == i ? "Confirmer la suppression ?" : dir;
+                            color: root.pending-remove == i ? Theme.accent-cyan : Theme.text-secondary;
+                            font-size: 11px;
+                            horizontal-stretch: 1;
+                            overflow: elide;
+                        }
+                        Text { text: root.pending-remove == i ? "!" : "×"; color: Theme.accent-cyan; font-size: 15px; }
+                    }
+
+                    Text { text: "NOUVEAU DOSSIER (CHEMIN ABSOLU)"; color: Theme.text-muted; font-size: 9px; font-weight: 700; letter-spacing: 1px; }
+
+                    Rectangle {
+                        height: 34px;
+                        border-radius: 8px;
+                        background: Theme.sidebar;
+                        border-width: 1px;
+                        border-color: Theme.border;
+
+                        TextInput {
+                            x: 10px;
+                            y: 7px;
+                            width: parent.width - 20px;
+                            text: root.new-dir-text;
+                            color: Theme.text-primary;
+                            font-size: 12px;
+                            edited => { root.new-dir-text = self.text; root.pending-remove = -1; }
+                        }
+                    }
+
+                    ListRow {
+                        row-height: 46px;
+                        row-padding: 10px;
+                        focused: root.content-focused && root.focused-item == 3 + root.game-dirs.length;
+                        selected: root.focused-item == 3 + root.game-dirs.length;
+                        activated => { root.pending-remove = -1; root.add-dir(root.new-dir-text); }
+                        Text { text: "AJOUTER LE DOSSIER"; color: Theme.accent-cyan; font-size: 11px; font-weight: 700; letter-spacing: 1px; vertical-alignment: center; horizontal-alignment: center; }
+                    }
+
+                    ListRow {
+                        row-height: 46px;
+                        row-padding: 10px;
+                        focused: root.content-focused && root.focused-item == 4 + root.game-dirs.length;
+                        selected: root.focused-item == 4 + root.game-dirs.length;
+                        activated => { root.pending-remove = -1; root.scan-now(); }
+                        Text { text: "ANALYSER MAINTENANT"; color: Theme.accent-blue; font-size: 11px; font-weight: 700; letter-spacing: 1px; vertical-alignment: center; horizontal-alignment: center; }
+                    }
+
+                    Rectangle {
+                        height: 5px;
+                        border-radius: 3px;
+                        background: Theme.border;
+
+                        Rectangle {
+                            width: parent.width * root.scan-progress;
+                            height: parent.height;
+                            border-radius: 3px;
+                            background: Theme.accent-cyan;
+                        }
+                    }
+
+                    Text { text: root.scan-status; color: Theme.text-muted; font-size: 10px; }
+                }
+            }
+
+            VerticalLayout {
+                horizontal-stretch: 2;
+                spacing: 8px;
+
+                GlassPanel {
+                    panel-padding: 12px;
+                    panel-spacing: 6px;
+                    Text { text: "SYSTÈME"; color: Theme.accent-indigo; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
+                    for row in root.system-rows: Text { text: row; color: Theme.text-secondary; font-size: 11px; wrap: word-wrap; }
+                }
+
+                GlassPanel {
+                    panel-padding: 12px;
+                    panel-spacing: 6px;
+                    Text { text: "MANETTE"; color: Theme.accent-indigo; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
+                    Text { text: "GilRs · accès rootless via le seat"; color: Theme.text-secondary; font-size: 11px; }
+                    Text { text: "X pour un favori · Y pour marquer joué"; color: Theme.text-muted; font-size: 10px; }
+                    Text { text: "Profils de boutons : config.json"; color: Theme.text-muted; font-size: 10px; }
+                }
+
+                Rectangle { vertical-stretch: 1; background: transparent; }
+            }
+    }
+
+}

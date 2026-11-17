@@ -8,12 +8,20 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 gilrs = "=0.11.2"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.0"
 slint = { version = "~1.18.1", default-features = false, features = [
     "compat-1-18",
     "backend-winit-wayland",
     "renderer-femtovg",
     "renderer-software",
 ] }
+walkdir = "2.5.0"
 
 [build-dependencies]
 slint-build = "~1.18.1"
+
+[dev-dependencies]
+tempfile = "3.27.0"

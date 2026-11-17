@@ -126,7 +126,7 @@ This is a proposed boundary map, not a commitment to create every crate immediat
 
 ## 6. Library and persistence
 
-SQLite is the initial local index. It stores game records, detected systems, emulator associations, play history, and metadata references.
+SQLite is the initial local index. It stores game records, detected systems, emulator associations, play history, and metadata references. The Phase 2 implementation and its safety rules are documented in [PHASE-2.md](PHASE-2.md).
 
 ROM and disc image files remain in the user's chosen directories. B-Emu indexes them; it does not silently move or rewrite them.
 
@@ -154,21 +154,17 @@ Every emulator adapter should report:
 
 Settings are capability-driven. An adapter must not expose a setting unless it can verify that the installed emulator version supports it. Unknown settings remain hidden rather than guessed.
 
-The first adapters should be selected based on availability and testability on Debian-based Linux, then expanded.
+The first adapters should be selected based on availability and testability on Debian-based Linux, then expanded. The Phase 3 implementation is documented in [PHASE-3.md](PHASE-3.md).
 
 ## 8. Controller and mouse input
 
 The interface is controller-first but remains fully usable with a mouse and keyboard.
 
-The input service owns:
+The input service owns controller discovery and hotplug through GilRs, button/axis normalization, and controller disconnect handling. Polling runs on a dedicated thread and reaches Slint only through `Weak::upgrade_in_event_loop`; the UI thread is never blocked by evdev polling. The worker is stopped and joined when the main window exits.
 
-- Controller discovery and hotplug.
-- Button and axis mapping.
-- Configurable navigation bindings.
-- Focus movement and activation.
-- Clear handling of controller disconnects.
+The current shell maps vertical navigation, confirm, and back-to-home. Horizontal actions are normalized for later screens but do not change the vertical sidebar. Analog navigation uses activation and return thresholds to avoid jitter.
 
-Input events are translated into application-level actions so that the UI is not tied to a specific controller model.
+Access remains rootless and follows the active Linux seat/session ACL policy. B-Emu never changes `/dev/input` permissions, adds the user to the `input` group, or requests root. If access is unavailable, the gamepad worker reports it and keyboard/mouse input remains available. See [GAMEPAD.md](GAMEPAD.md) for the mapping and runtime details.
 
 ## 9. Visual direction
 

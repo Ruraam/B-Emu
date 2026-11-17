@@ -1,0 +1,35 @@
+{
+  "format_version": 5,
+  "id": "io.lpk.b-emu",
+  "name": "b-emu",
+  "version": "0.1.0",
+  "arch": "amd64",
+  "exec": "bin/b-emu",
+  "description": "Native Wayland emulation frontend",
+  "dependencies": [],
+  "shared": false,
+  "permissions": {
+    "network": false,
+    "audio": true,
+    "gui": true,
+    "gpu": true,
+    "filesystem": {
+      "home": "isolated",
+      "downloads": "none",
+      "custom": []
+    },
+    "devices": {
+      "dri": true,
+      "input": true,
+      "hidraw": false,
+      "usb": false,
+      "kvm": false
+    },
+    "dbus": {
+      "session": {
+        "talk": [],
+        "own": []
+      }
+    }
+  }
+}
