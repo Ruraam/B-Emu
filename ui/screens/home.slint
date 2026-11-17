@@ -1,0 +1,159 @@
+import { Theme } from "../theme.slint";
+import { GlassPanel } from "../components/glass-panel.slint";
+import { PageHeader } from "../components/page-header.slint";
+import { StatusPill } from "../components/status-pill.slint";
+import { GameCard } from "../models.slint";
+
+export component HomeScreen inherits VerticalLayout {
+    in property<[GameCard]> last-played;
+    in property<[GameCard]> recent-games;
+    in property<int> focused-item: 0;
+    in property<bool> content-focused: false;
+    in property<int> games-count: 0;
+    in property<int> systems-count: 0;
+    in property<int> emulators-count: 0;
+
+    spacing: 20px;
+
+    PageHeader {
+        eyebrow: "B-EMU / ACCUEIL";
+        title: "Accueil";
+        subtitle: "Reprenez votre partie, retrouvez vos systèmes et votre bibliothèque.";
+    }
+
+    GlassPanel {
+        preferred-height: 156px;
+        panel-padding: 20px;
+        focused: root.content-focused && root.focused-item == 0;
+
+        HorizontalLayout {
+            spacing: 20px;
+
+            Rectangle {
+                width: 116px;
+                border-radius: 12px;
+                background: root.last-played.length > 0 ? root.last-played[0].accent : Theme.accent-indigo;
+
+                VerticalLayout {
+                    padding: 12px;
+                    alignment: end;
+
+                    Text {
+                        text: root.last-played.length > 0 ? root.last-played[0].system : "";
+                        color: #020617;
+                        font-size: 10px;
+                        font-weight: 800;
+                        letter-spacing: 1px;
+                    }
+                }
+            }
+
+            VerticalLayout {
+                spacing: 8px;
+
+                Text {
+                    text: "REPRENDRE";
+                    color: Theme.accent-cyan;
+                    font-size: 10px;
+                    font-weight: 700;
+                    letter-spacing: 2px;
+                }
+
+                Text {
+                    text: root.last-played.length > 0 ? root.last-played[0].title : "Aucune partie en cours";
+                    color: Theme.text-primary;
+                    font-size: 24px;
+                    font-weight: 700;
+                }
+
+                Text {
+                    text: root.last-played.length > 0 ? root.last-played[0].detail : "Les jeux joués récemment apparaîtront ici.";
+                    color: Theme.text-secondary;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+
+                StatusPill { label: root.content-focused && root.focused-item == 0 ? "A · LANCER" : "A · SÉLECTIONNER"; }
+            }
+        }
+    }
+
+    Text {
+        text: "RÉCEMMENT JOUÉS";
+        color: Theme.text-muted;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+    }
+
+    HorizontalLayout {
+        spacing: 14px;
+
+        for game[i] in root.recent-games: GlassPanel {
+            horizontal-stretch: 1;
+            min-width: 140px;
+            preferred-height: 132px;
+            panel-padding: 14px;
+            focused: root.content-focused && root.focused-item == i + 1;
+            selected: root.focused-item == i + 1;
+
+            Rectangle {
+                height: 4px;
+                width: 36px;
+                border-radius: 2px;
+                background: game.accent;
+            }
+
+            Text {
+                text: game.title;
+                color: Theme.text-primary;
+                font-size: 15px;
+                font-weight: 700;
+                wrap: word-wrap;
+            }
+
+            Text {
+                text: game.system;
+                color: Theme.accent-blue;
+                font-size: 11px;
+            }
+
+            Text {
+                text: game.detail;
+                color: Theme.text-muted;
+                font-size: 10px;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    Rectangle {
+        vertical-stretch: 1;
+        background: transparent;
+    }
+
+    HorizontalLayout {
+        spacing: 14px;
+
+        GlassPanel {
+            horizontal-stretch: 1;
+            panel-padding: 14px;
+            Text { text: "JEUX INDEXÉS"; color: Theme.text-muted; font-size: 9px; font-weight: 700; letter-spacing: 1.2px; }
+            Text { text: root.games-count; color: Theme.text-primary; font-size: 22px; font-weight: 800; }
+        }
+
+        GlassPanel {
+            horizontal-stretch: 1;
+            panel-padding: 14px;
+            Text { text: "SYSTÈMES"; color: Theme.text-muted; font-size: 9px; font-weight: 700; letter-spacing: 1.2px; }
+            Text { text: root.systems-count; color: Theme.text-primary; font-size: 22px; font-weight: 800; }
+        }
+
+        GlassPanel {
+            horizontal-stretch: 1;
+            panel-padding: 14px;
+            Text { text: "ÉMULATEURS PRÊTS"; color: Theme.text-muted; font-size: 9px; font-weight: 700; letter-spacing: 1.2px; }
+            Text { text: root.emulators-count; color: Theme.text-primary; font-size: 22px; font-weight: 800; }
+        }
+    }
+}

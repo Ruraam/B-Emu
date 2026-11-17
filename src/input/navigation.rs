@@ -2,30 +2,130 @@
 
 use super::GamepadAction;
 
-/// Applies a normalized controller action to the five-item application sidebar.
+/// Number of pages in the application sidebar (Phase 1 shell).
+pub const PAGE_COUNT: i32 = 5;
+
+/// Which part of the shell currently owns keyboard/gamepad focus.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FocusZone {
+    Sidebar,
+    Content,
+}
+
+/// Complete navigation state of the shell.
 ///
-/// The function is deliberately independent from Slint so its wraparound and
-/// activation behavior can be tested without creating a window.
+/// This is deliberately independent from Slint so transitions can be tested
+/// without creating a window. The worker reads the current state from the UI,
+/// applies one action, and writes the result back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Navigation {
+    pub focused_page: i32,
+    pub active_page: i32,
+    pub zone: FocusZone,
+    pub focused_item: i32,
+    pub selected_item: i32,
+}
+
+impl Default for Navigation {
+    fn default() -> Self {
+        Self {
+            focused_page: 0,
+            active_page: 0,
+            zone: FocusZone::Sidebar,
+            focused_item: 0,
+            selected_item: -1,
+        }
+    }
+}
+
+fn wrap(value: i32, count: i32) -> i32 {
+    if count <= 0 {
+        0
+    } else {
+        value.rem_euclid(count)
+    }
+}
+
+/// Applies a normalized controller action to the shell navigation state.
+///
+/// `item_count` is the number of focusable items in the active screen. It is
+/// provided by the UI because each screen owns its own model.
+pub fn apply_action(state: Navigation, action: GamepadAction, item_count: i32) -> Navigation {
+    // Normalize page indices once so every transition sees valid values.
+    let state = Navigation {
+        focused_page: wrap(state.focused_page, PAGE_COUNT),
+        active_page: wrap(state.active_page, PAGE_COUNT),
+        ..state
+    };
+
+    match state.zone {
+        FocusZone::Sidebar => match action {
+            GamepadAction::NavigateUp => Navigation {
+                focused_page: wrap(state.focused_page - 1, PAGE_COUNT),
+                ..state
+            },
+            GamepadAction::NavigateDown => Navigation {
+                focused_page: wrap(state.focused_page + 1, PAGE_COUNT),
+                ..state
+            },
+            GamepadAction::Confirm => Navigation {
+                active_page: state.focused_page,
+                zone: FocusZone::Content,
+                focused_item: 0,
+                selected_item: -1,
+                ..state
+            },
+            GamepadAction::Back => Navigation {
+                focused_page: 0,
+                active_page: 0,
+                focused_item: 0,
+                selected_item: -1,
+                ..state
+            },
+            GamepadAction::NavigateLeft | GamepadAction::NavigateRight => state,
+        },
+        FocusZone::Content => match action {
+            GamepadAction::NavigateUp => Navigation {
+                focused_item: wrap(state.focused_item - 1, item_count),
+                ..state
+            },
+            GamepadAction::NavigateDown => Navigation {
+                focused_item: wrap(state.focused_item + 1, item_count),
+                ..state
+            },
+            GamepadAction::Confirm => Navigation {
+                selected_item: state.focused_item,
+                ..state
+            },
+            GamepadAction::Back => Navigation {
+                zone: FocusZone::Sidebar,
+                focused_item: 0,
+                selected_item: -1,
+                ..state
+            },
+            GamepadAction::NavigateLeft | GamepadAction::NavigateRight => state,
+        },
+    }
+}
+
+/// Sidebar-only transition kept as a small convenience wrapper.
 pub fn apply_sidebar_action(
     focused_page: i32,
     active_page: i32,
     action: GamepadAction,
 ) -> (i32, i32) {
-    let focused_page = focused_page.rem_euclid(5);
-    let active_page = active_page.rem_euclid(5);
-
-    match action {
-        GamepadAction::NavigateUp => ((focused_page + 4) % 5, active_page),
-        GamepadAction::NavigateDown => ((focused_page + 1) % 5, active_page),
-        GamepadAction::Confirm => (focused_page, focused_page),
-        GamepadAction::Back => (0, 0),
-        GamepadAction::NavigateLeft | GamepadAction::NavigateRight => (focused_page, active_page),
-    }
+    let state = Navigation {
+        focused_page,
+        active_page,
+        ..Navigation::default()
+    };
+    let next = apply_action(state, action, 0);
+    (next.focused_page, next.active_page)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::apply_sidebar_action;
+    use super::{FocusZone, Navigation, apply_action, apply_sidebar_action};
     use crate::input::GamepadAction;
 
     #[test]
@@ -65,5 +165,73 @@ mod tests {
     #[test]
     fn invalid_page_indices_are_normalized() {
         assert_eq!(apply_sidebar_action(-1, 7, GamepadAction::Confirm), (4, 4));
+    }
+
+    #[test]
+    fn confirm_moves_focus_into_the_content() {
+        let state = Navigation {
+            focused_page: 2,
+            ..Navigation::default()
+        };
+        let next = apply_action(state, GamepadAction::Confirm, 4);
+        assert_eq!(next.active_page, 2);
+        assert_eq!(next.zone, FocusZone::Content);
+        assert_eq!(next.focused_item, 0);
+    }
+
+    #[test]
+    fn content_navigation_wraps_within_the_screen_item_count() {
+        let state = Navigation {
+            zone: FocusZone::Content,
+            focused_item: 0,
+            ..Navigation::default()
+        };
+        assert_eq!(
+            apply_action(state, GamepadAction::NavigateUp, 3).focused_item,
+            2
+        );
+        assert_eq!(
+            apply_action(state, GamepadAction::NavigateDown, 3).focused_item,
+            1
+        );
+    }
+
+    #[test]
+    fn content_confirm_selects_the_focused_item() {
+        let state = Navigation {
+            zone: FocusZone::Content,
+            focused_item: 2,
+            ..Navigation::default()
+        };
+        let next = apply_action(state, GamepadAction::Confirm, 4);
+        assert_eq!(next.selected_item, 2);
+    }
+
+    #[test]
+    fn content_back_returns_focus_to_the_sidebar() {
+        let state = Navigation {
+            active_page: 3,
+            zone: FocusZone::Content,
+            focused_item: 2,
+            selected_item: 2,
+            ..Navigation::default()
+        };
+        let next = apply_action(state, GamepadAction::Back, 4);
+        assert_eq!(next.zone, FocusZone::Sidebar);
+        assert_eq!(next.active_page, 3);
+        assert_eq!(next.selected_item, -1);
+    }
+
+    #[test]
+    fn empty_screens_keep_item_index_at_zero() {
+        let state = Navigation {
+            zone: FocusZone::Content,
+            focused_item: 0,
+            ..Navigation::default()
+        };
+        assert_eq!(
+            apply_action(state, GamepadAction::NavigateDown, 0).focused_item,
+            0
+        );
     }
 }

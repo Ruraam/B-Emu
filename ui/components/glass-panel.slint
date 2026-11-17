@@ -2,11 +2,13 @@ import { Theme } from "../theme.slint";
 
 export component GlassPanel inherits Rectangle {
     in property<length> panel-padding: 22px;
+    in property<bool> focused: false;
+    in property<bool> selected: false;
 
-    background: Theme.panel;
+    background: root.focused ? Theme.panel-raised : Theme.panel;
     border-radius: 18px;
-    border-width: 1px;
-    border-color: Theme.border;
+    border-width: root.focused ? 2px : 1px;
+    border-color: root.focused ? Theme.accent-cyan : (root.selected ? Theme.border-highlight : Theme.border);
 
     VerticalLayout {
         padding: root.panel-padding;

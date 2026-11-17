@@ -1,0 +1,27 @@
+import { Theme } from "../theme.slint";
+
+export component ListRow inherits Rectangle {
+    in property<bool> focused: false;
+    in property<bool> selected: false;
+
+    height: 58px;
+    border-radius: 10px;
+    background: root.focused ? Theme.sidebar-focus : Theme.panel;
+    border-width: root.focused ? 2px : 1px;
+    border-color: root.focused ? Theme.accent-cyan : (root.selected ? Theme.border-highlight : Theme.border);
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 14px;
+        @children
+    }
+
+    TouchArea {
+        clicked => {
+            root.activated();
+        }
+    }
+
+    callback activated();
+}

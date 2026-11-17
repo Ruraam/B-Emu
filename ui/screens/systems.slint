@@ -1,0 +1,93 @@
+import { Theme } from "../theme.slint";
+import { GlassPanel } from "../components/glass-panel.slint";
+import { PageHeader } from "../components/page-header.slint";
+import { StatusPill } from "../components/status-pill.slint";
+import { SystemCard } from "../models.slint";
+
+component SystemTile inherits GlassPanel {
+    in property<SystemCard> data;
+    in property<bool> tile-focused: false;
+    in property<bool> tile-selected: false;
+
+    min-width: 180px;
+    preferred-height: 150px;
+    panel-padding: 16px;
+    focused: root.tile-focused;
+    selected: root.tile-selected;
+
+    Rectangle {
+        height: 5px;
+        width: 44px;
+        border-radius: 3px;
+        background: root.data.accent;
+    }
+
+    Text {
+        text: root.data.name;
+        color: Theme.text-primary;
+        font-size: 18px;
+        font-weight: 700;
+    }
+
+    Text {
+        text: root.data.manufacturer;
+        color: Theme.text-secondary;
+        font-size: 12px;
+    }
+
+    Rectangle {
+        vertical-stretch: 1;
+        background: transparent;
+    }
+
+    HorizontalLayout {
+        Text { text: root.data.game-count; color: Theme.accent-cyan; font-size: 20px; font-weight: 700; }
+        Text { text: "jeux indexés"; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+    }
+}
+
+export component SystemsScreen inherits VerticalLayout {
+    in property<[SystemCard]> systems;
+    in property<int> focused-item: 0;
+    in property<bool> content-focused: false;
+
+    spacing: 20px;
+
+    PageHeader {
+        eyebrow: "B-EMU / SYSTÈMES";
+        title: "Systèmes";
+        subtitle: "Les plateformes détectées dans votre bibliothèque.";
+    }
+
+    GlassPanel {
+        panel-padding: 14px;
+        Text {
+            text: "Les systèmes sont découverts à partir de vos dossiers de jeux. L'indexation complète arrive en Phase 2.";
+            color: Theme.text-secondary;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
+    }
+
+    GridLayout {
+        spacing: 14px;
+
+        for system[i] in root.systems: SystemTile {
+            row: Math.floor(i / 3);
+            col: Math.mod(i, 3);
+            data: system;
+            tile-focused: root.content-focused && root.focused-item == i;
+            tile-selected: root.focused-item == i;
+        }
+    }
+
+    Rectangle {
+        vertical-stretch: 1;
+        background: transparent;
+    }
+
+    StatusPill {
+        label: "↑ ↓ SYSTÈME  ·  A OUVRIR  ·  B RETOUR";
+        positive: true;
+    }
+}

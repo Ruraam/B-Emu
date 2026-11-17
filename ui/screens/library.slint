@@ -1,0 +1,121 @@
+import { Theme } from "../theme.slint";
+import { GlassPanel } from "../components/glass-panel.slint";
+import { PageHeader } from "../components/page-header.slint";
+import { ListRow } from "../components/list-row.slint";
+import { StatusPill } from "../components/status-pill.slint";
+import { GameCard } from "../models.slint";
+
+export component LibraryScreen inherits VerticalLayout {
+    in property<[GameCard]> games;
+    in property<int> focused-item: 0;
+    in property<bool> content-focused: false;
+    in property<int> selected-item: -1;
+    in property<string> search-text: "";
+    callback search-changed(string);
+
+    spacing: 16px;
+
+    PageHeader {
+        eyebrow: "B-EMU / BIBLIOTHÈQUE";
+        title: "Bibliothèque";
+        subtitle: "Recherchez et organisez vos jeux. L'indexation disque arrive en Phase 2.";
+    }
+
+    GlassPanel {
+        panel-padding: 10px;
+        preferred-height: 52px;
+
+        HorizontalLayout {
+            spacing: 12px;
+            padding-left: 12px;
+            padding-right: 12px;
+
+            Text { text: "⌕"; color: Theme.accent-cyan; font-size: 20px; vertical-alignment: center; }
+            Text { text: "RECHERCHE"; color: Theme.text-muted; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; vertical-alignment: center; }
+
+            TextInput {
+                horizontal-stretch: 1;
+                text: root.search-text;
+                color: Theme.text-primary;
+                font-size: 14px;
+                vertical-alignment: center;
+                edited => { root.search-changed(self.text); }
+            }
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 16px;
+
+        VerticalLayout {
+            horizontal-stretch: 2;
+            spacing: 8px;
+
+            Text {
+                text: "JEUX";
+                color: Theme.text-muted;
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: 1.5px;
+            }
+
+            for game[i] in root.games: ListRow {
+                focused: root.content-focused && root.focused-item == i;
+                selected: root.selected-item == i;
+
+                Rectangle {
+                    width: 4px;
+                    height: 26px;
+                    border-radius: 2px;
+                    background: game.accent;
+                }
+
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 2px;
+                    Text { text: game.title; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
+                    Text { text: game.system; color: Theme.text-secondary; font-size: 11px; }
+                }
+
+                Text { text: game.detail; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+            }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 10px;
+
+            GlassPanel {
+                vertical-stretch: 1;
+                focused: root.content-focused && root.selected-item >= 0;
+
+                Text { text: "DÉTAILS"; color: Theme.accent-indigo; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
+
+                Text {
+                    text: root.selected-item >= 0 && root.selected-item < root.games.length ? root.games[root.selected-item].title : "Aucun jeu sélectionné";
+                    color: Theme.text-primary;
+                    font-size: 20px;
+                    font-weight: 700;
+                    wrap: word-wrap;
+                }
+
+                Text {
+                    text: root.selected-item >= 0 && root.selected-item < root.games.length ? root.games[root.selected-item].system : "Choisissez un jeu dans la liste.";
+                    color: Theme.accent-blue;
+                    font-size: 12px;
+                }
+
+                Text {
+                    text: root.selected-item >= 0 && root.selected-item < root.games.length ? root.games[root.selected-item].detail : "";
+                    color: Theme.text-secondary;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+
+                Rectangle { vertical-stretch: 1; background: transparent; }
+
+                StatusPill { label: "A · SÉLECTIONNER"; }
+            }
+        }
+    }
+}

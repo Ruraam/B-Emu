@@ -1,0 +1,36 @@
+// Shared view models for the Phase 1 application shell.
+//
+// These types are filled by the Rust shell module. Keeping them here lets the
+// screens stay data-driven: Phase 2/3 services can replace the seed data
+// without rewriting the interface.
+
+export enum NavAction {
+    up,
+    down,
+    left,
+    right,
+    confirm,
+    back,
+}
+
+export struct GameCard {
+    title: string,
+    system: string,
+    detail: string,
+    accent: color,
+}
+
+export struct SystemCard {
+    name: string,
+    manufacturer: string,
+    game-count: int,
+    accent: color,
+}
+
+export struct EmulatorRow {
+    name: string,
+    version: string,
+    status: string,
+    systems: string,
+    ready: bool,
+}

@@ -1,0 +1,26 @@
+import { Theme } from "../theme.slint";
+
+export component StatusPill inherits Rectangle {
+    in property<string> label: "";
+    in property<bool> positive: true;
+
+    height: 24px;
+    border-radius: 12px;
+    background: root.positive ? #12304A : #2A1D33;
+    border-width: 1px;
+    border-color: root.positive ? Theme.border-highlight : #6B4A6B;
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+
+        Text {
+            text: root.label;
+            color: root.positive ? Theme.accent-cyan : Theme.text-secondary;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            vertical-alignment: center;
+        }
+    }
+}

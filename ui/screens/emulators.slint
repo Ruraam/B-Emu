@@ -1,0 +1,66 @@
+import { Theme } from "../theme.slint";
+import { GlassPanel } from "../components/glass-panel.slint";
+import { PageHeader } from "../components/page-header.slint";
+import { ListRow } from "../components/list-row.slint";
+import { StatusPill } from "../components/status-pill.slint";
+import { EmulatorRow } from "../models.slint";
+
+export component EmulatorsScreen inherits VerticalLayout {
+    in property<[EmulatorRow]> emulators;
+    in property<int> focused-item: 0;
+    in property<bool> content-focused: false;
+
+    spacing: 16px;
+
+    PageHeader {
+        eyebrow: "B-EMU / ÉMULATEURS";
+        title: "Émulateurs";
+        subtitle: "Émulateurs détectés sur le système. Les adaptations et le lancement arrivent en Phase 3.";
+    }
+
+    GlassPanel {
+        panel-padding: 14px;
+        Text {
+            text: "Seuls les réglages réellement exposés par la version installée seront proposés. Aucun réglage universel inventé.";
+            color: Theme.text-secondary;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
+    }
+
+    VerticalLayout {
+        spacing: 8px;
+
+        for emulator[i] in root.emulators: ListRow {
+            focused: root.content-focused && root.focused-item == i;
+            selected: root.focused-item == i;
+
+            Rectangle {
+                width: 4px;
+                height: 26px;
+                border-radius: 2px;
+                background: emulator.ready ? Theme.accent-cyan : Theme.text-muted;
+            }
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 2px;
+                Text { text: emulator.name; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
+                Text { text: emulator.systems; color: Theme.text-secondary; font-size: 11px; }
+            }
+
+            Text { text: emulator.version; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+            StatusPill { label: emulator.status; positive: emulator.ready; }
+        }
+    }
+
+    Rectangle {
+        vertical-stretch: 1;
+        background: transparent;
+    }
+
+    StatusPill {
+        label: "↑ ↓ ÉMULATEUR  ·  A DÉTAILS  ·  B RETOUR";
+        positive: true;
+    }
+}

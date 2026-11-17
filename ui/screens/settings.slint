@@ -1,0 +1,113 @@
+import { Theme } from "../theme.slint";
+import { GlassPanel } from "../components/glass-panel.slint";
+import { PageHeader } from "../components/page-header.slint";
+import { ListRow } from "../components/list-row.slint";
+import { StatusPill } from "../components/status-pill.slint";
+
+component Toggle inherits Rectangle {
+    in property<bool> on: false;
+
+    width: 42px;
+    height: 22px;
+    border-radius: 11px;
+    background: root.on ? Theme.accent-cyan : Theme.border;
+
+    Rectangle {
+        x: root.on ? 22px : 3px;
+        y: 3px;
+        width: 16px;
+        height: 16px;
+        border-radius: 8px;
+        background: root.on ? #020617 : Theme.text-secondary;
+    }
+}
+
+export component SettingsScreen inherits VerticalLayout {
+    in property<bool> auto-scan: true;
+    in property<bool> vibration: true;
+    in property<bool> reduced-motion: false;
+    in property<int> focused-item: 0;
+    in property<bool> content-focused: false;
+    callback toggle-setting(int);
+
+    spacing: 16px;
+
+    PageHeader {
+        eyebrow: "B-EMU / PARAMÈTRES";
+        title: "Paramètres";
+        subtitle: "Préférences locales, conservées dans les répertoires utilisateur XDG.";
+    }
+
+    GlassPanel {
+        panel-padding: 14px;
+        Text {
+            text: "Phase 1 : les préférences sont des valeurs de démonstration pilotées par le modèle Rust. La persistance arrive avec la Phase 2.";
+            color: Theme.text-secondary;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
+    }
+
+    VerticalLayout {
+        spacing: 8px;
+
+        ListRow {
+            focused: root.content-focused && root.focused-item == 0;
+            selected: root.focused-item == 0;
+            activated => { root.toggle-setting(0); }
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 2px;
+                Text { text: "Analyse automatique"; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
+                Text { text: "Indexer les dossiers de jeux au démarrage"; color: Theme.text-muted; font-size: 11px; }
+            }
+
+            Toggle { on: root.auto-scan; }
+        }
+
+        ListRow {
+            focused: root.content-focused && root.focused-item == 1;
+            selected: root.focused-item == 1;
+            activated => { root.toggle-setting(1); }
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 2px;
+                Text { text: "Retour de force"; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
+                Text { text: "Vibration de la manette lors de la navigation"; color: Theme.text-muted; font-size: 11px; }
+            }
+
+            Toggle { on: root.vibration; }
+        }
+
+        ListRow {
+            focused: root.content-focused && root.focused-item == 2;
+            selected: root.focused-item == 2;
+            activated => { root.toggle-setting(2); }
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 2px;
+                Text { text: "Réduire les animations"; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
+                Text { text: "Respecter la préférence système de mouvement réduit"; color: Theme.text-muted; font-size: 11px; }
+            }
+
+            Toggle { on: root.reduced-motion; }
+        }
+    }
+
+    Rectangle {
+        vertical-stretch: 1;
+        background: transparent;
+    }
+
+    GlassPanel {
+        panel-padding: 14px;
+        Text { text: "SYSTÈME"; color: Theme.accent-indigo; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
+        Text { text: "Linux · Wayland natif · rendu FemtoVG / logiciel"; color: Theme.text-secondary; font-size: 12px; }
+        Text { text: "B-Emu est autonome : BubbleWM n'est pas une dépendance."; color: Theme.text-muted; font-size: 11px; }
+    }
+
+    StatusPill { label: "↑ ↓ OPTION  ·  A BASCULER  ·  B RETOUR"; positive: true; }
+}
