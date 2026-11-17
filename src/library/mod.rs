@@ -158,15 +158,22 @@ impl Library {
         let mut report = ScanReport::default();
         let mut seen = HashSet::new();
         let mut discovered = Vec::new();
+        let mut completed_roots = Vec::new();
 
         for root in roots {
+            // A missing or unavailable root is not evidence that its games
+            // were deleted. Keep its existing database rows untouched.
             if !root.is_dir() {
+                report.errors += 1;
                 continue;
             }
 
             let result = scanner::scan_root(root, &known, cancel, on_progress);
             report.errors += result.errors;
             report.cancelled |= result.cancelled;
+            if result.errors == 0 && !result.cancelled {
+                completed_roots.push(root.clone());
+            }
 
             for (game, outcome) in result.games {
                 seen.insert(game.path.clone());
@@ -183,9 +190,12 @@ impl Library {
             }
         }
 
-        // One transaction: a crash cannot leave a half-written index. Only a
-        // completed scan is allowed to prune rows.
-        report.removed = self.db.apply_scan(&discovered, &seen, !report.cancelled)?;
+        // One transaction: a crash cannot leave a half-written index. Prune
+        // only roots that were accessible and scanned without any errors.
+        // Successful roots can still be updated when another root fails.
+        report.removed = self
+            .db
+            .apply_scan(&discovered, &seen, &completed_roots)?;
         Ok(report)
     }
 }
@@ -236,6 +246,59 @@ mod tests {
 
         assert_eq!(second.added, 0);
         assert_eq!(second.unchanged, 1);
+    }
+
+    #[test]
+    fn missing_root_does_not_delete_indexed_games_or_user_data() {
+        let dir = tempfile::tempdir().unwrap();
+        let roms = dir.path().join("roms");
+        fs::create_dir(&roms).unwrap();
+        let path = roms.join("game.nes");
+        fs::write(&path, b"rom").unwrap();
+
+        let mut library = Library::open_in_memory().unwrap();
+        library.scan(&[roms.clone()], &AtomicBool::new(false), &mut |_| {}).unwrap();
+        let key = path.to_string_lossy().to_string();
+        library.toggle_favorite(&key).unwrap();
+        library.mark_played(&key).unwrap();
+
+        fs::remove_dir_all(&roms).unwrap();
+        let report = library.scan(&[roms], &AtomicBool::new(false), &mut |_| {}).unwrap();
+
+        assert_eq!(report.removed, 0);
+        assert_eq!(report.errors, 1);
+        assert_eq!(library.games().unwrap().len(), 1);
+        assert!(library.favorite_paths().unwrap().contains(&key));
+        assert_eq!(library.recently_played(10).unwrap().len(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn descendant_scan_error_preserves_existing_entries_for_that_root() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let roms = dir.path().join("roms");
+        let blocked = roms.join("blocked");
+        fs::create_dir_all(&blocked).unwrap();
+        let path = blocked.join("game.nes");
+        fs::write(&path, b"rom").unwrap();
+
+        let mut library = Library::open_in_memory().unwrap();
+        library.scan(&[roms.clone()], &AtomicBool::new(false), &mut |_| {}).unwrap();
+        let key = path.to_string_lossy().to_string();
+        library.toggle_favorite(&key).unwrap();
+        library.mark_played(&key).unwrap();
+
+        fs::set_permissions(&blocked, fs::Permissions::from_mode(0o000)).unwrap();
+        let report = library.scan(&[roms], &AtomicBool::new(false), &mut |_| {}).unwrap();
+        fs::set_permissions(&blocked, fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert!(report.errors > 0);
+        assert_eq!(report.removed, 0);
+        assert_eq!(library.games().unwrap().len(), 1);
+        assert!(library.favorite_paths().unwrap().contains(&key));
+        assert_eq!(library.recently_played(10).unwrap().len(), 1);
     }
 
     #[test]
