@@ -2,8 +2,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    fs,
-    io,
+    fs, io,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
